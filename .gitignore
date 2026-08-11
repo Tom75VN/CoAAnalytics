@@ -1,0 +1,19 @@
+# Local packages and backups
+*.zip
+*.7z
+*.rar
+*.bak
+*.tmp
+
+# Runtime data and diagnostic exports
+SavedVariables/
+WTF/
+CoAAnalytics.lua
+*.log
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
