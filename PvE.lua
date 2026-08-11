@@ -13,6 +13,7 @@ local COMBAT_END_GRACE = 2
 local DUNGEON_COMPLETION_DELAY = 1.5
 local DUNGEON_COMPLETION_TIMEOUT = 6
 local ROSTER_INTERVAL = 3
+local ROSTER_REPLACEMENT_GRACE = 1.5
 local MOB_FORGET_DELAY = 5
 local LOSS_GRACE = 1
 local MAX_NAMEPLATE_UNITS = 40
@@ -548,6 +549,65 @@ local function GetSampleStats(sample, guid)
 	return stats
 end
 
+local function RemovePlayerStatsFromSample(sample, guid, departedRole)
+	if not sample or type(sample.players) ~= "table" then
+		return
+	end
+	local stats = sample.players[guid]
+	if type(stats) ~= "table" then
+		return
+	end
+	local totals = {
+		groupDamageTaken = "damageTaken",
+		deaths = "deaths",
+		preventableDeaths = "preventableDeaths",
+		oneShotDeaths = "oneShotDeaths",
+		outOfReachDeaths = "outOfReachDeaths",
+		recoveryDeaths = "recoveryDeaths",
+		nonCombatDeaths = "nonCombatDeaths",
+		petSummons = "summonCount",
+	}
+	for totalKey, statKey in pairs(totals) do
+		sample[totalKey] = math.max(
+			0,
+			SafeNumber(sample[totalKey]) - SafeNumber(stats[statKey])
+		)
+	end
+	-- Les anciens clients ne permettent pas toujours d'identifier le lanceur
+	-- d'un bouclier. Si le soigneur est remplace, ce montant ambigu ne doit pas
+	-- etre attribue au nouveau soigneur.
+	if departedRole == "HEALER" then
+		sample.unattributedAbsorb = 0
+	end
+	sample.players[guid] = nil
+end
+
+local function PurgeDepartedRosterMember(guid)
+	if not session or not guid then
+		return false
+	end
+	local member = session.roster[guid]
+	if not member or member.present then
+		return false
+	end
+	local departedRole = GetRole(member)
+	RemovePlayerStatsFromSample(session.run, guid, departedRole)
+	RemovePlayerStatsFromSample(session.encounter, guid, departedRole)
+	for petGUID, ownerGUID in pairs(session.petOwners or {}) do
+		if ownerGUID == guid then
+			session.petOwners[petGUID] = nil
+		end
+	end
+	for _, mob in pairs(session.mobs or {}) do
+		if mob.ownerGUID == guid then
+			mob.ownerGUID = nil
+			mob.lossStartedAt = nil
+		end
+	end
+	session.roster[guid] = nil
+	return true
+end
+
 local function RefreshRoster()
 	if not session then
 		return
@@ -558,6 +618,7 @@ local function RefreshRoster()
 
 	local now = GetTime()
 	local found = {}
+	local newMemberDetected = false
 	local units = { "player" }
 	for index = 1, 40 do
 		units[#units + 1] = "raid" .. index
@@ -572,6 +633,7 @@ local function RefreshRoster()
 				found[guid] = true
 				local member = session.roster[guid]
 				if not member then
+					newMemberDetected = true
 					member = {
 						guid = guid,
 						joinedAt = now,
@@ -615,22 +677,40 @@ local function RefreshRoster()
 	end
 
 	local currentCount = 0
+	local departedGUIDs = {}
 	for guid, member in pairs(session.roster) do
 		if found[guid] then
 			currentCount = currentCount + 1
-		elseif member.present then
-			member.presenceSeconds = SafeNumber(member.presenceSeconds)
-				+ math.max(0, now - SafeNumber(member.presentSince))
-			member.present = false
-			member.presentSince = nil
-			member.leftAt = now
-			member.leaveCount = SafeNumber(member.leaveCount) + 1
-			member.unit = nil
-			session.rosterChanged = true
+		else
+			departedGUIDs[#departedGUIDs + 1] = guid
+			if member.present then
+				member.presenceSeconds = SafeNumber(member.presenceSeconds)
+					+ math.max(0, now - SafeNumber(member.presentSince))
+				member.present = false
+				member.presentSince = nil
+				member.leftAt = now
+				member.leaveCount = SafeNumber(member.leaveCount) + 1
+				member.unit = nil
+				session.rosterChanged = true
+			end
 		end
+	end
+	if session.rosterInitialized and newMemberDetected then
+		session.replacementPurgePendingAt = now + ROSTER_REPLACEMENT_GRACE
+	end
+	if session.replacementPurgePendingAt
+		and now >= session.replacementPurgePendingAt
+	then
+		local removed = 0
+		for _, guid in ipairs(departedGUIDs) do
+			removed = PurgeDepartedRosterMember(guid) and removed + 1 or removed
+		end
+		session.replacementCount = SafeNumber(session.replacementCount) + removed
+		session.replacementPurgePendingAt = nil
 	end
 	session.currentGroupSize = currentCount
 	session.peakGroupSize = math.max(SafeNumber(session.peakGroupSize), currentCount)
+	session.rosterInitialized = true
 
 	-- Ne pas vider cette table ici. Les familiers exposes par une unite
 	-- pet/partypet/raidpet peuvent etre reconstruits ci-dessous, mais les
@@ -941,24 +1021,26 @@ local function SnapshotParticipants(sample)
 	local participants = {}
 	local rosterSize = 0
 	for guid, member in pairs(session and session.roster or {}) do
-		rosterSize = rosterSize + 1
-		local stats = sample.players[guid] or NewStats(member)
-		local data = GetMemberData(member)
-		local presenceSeconds = SafeNumber(member.presenceSeconds)
-		if member.present and member.presentSince then
-			presenceSeconds = presenceSeconds
-				+ math.max(0, GetTime() - SafeNumber(member.presentSince))
+		if member.present then
+			rosterSize = rosterSize + 1
+			local stats = sample.players[guid] or NewStats(member)
+			local data = GetMemberData(member)
+			local presenceSeconds = SafeNumber(member.presenceSeconds)
+			if member.presentSince then
+				presenceSeconds = presenceSeconds
+					+ math.max(0, GetTime() - SafeNumber(member.presentSince))
+			end
+			participants[#participants + 1] = {
+				guid = guid,
+				member = member,
+				data = data,
+				role = GetRole(member),
+				stats = stats,
+				level = member.level or data and data.level,
+				presenceSeconds = presenceSeconds,
+				currentlyPresent = true,
+			}
 		end
-		participants[#participants + 1] = {
-			guid = guid,
-			member = member,
-			data = data,
-			role = GetRole(member),
-			stats = stats,
-			level = member.level or data and data.level,
-			presenceSeconds = presenceSeconds,
-			currentlyPresent = member.present and true or false,
-		}
 	end
 	local nominalMaximum = SafeNumber(sample.maxPlayers)
 	local simultaneous = math.max(
@@ -4123,7 +4205,7 @@ BuildCurrentDungeonSnapshot = function(finished)
 		ratedPlayers = ratingCount,
 		groupSize = SafeNumber(sample.groupSize),
 		rosterSize = #snapshotRows,
-		replacements = math.max(0, #snapshotRows - SafeNumber(sample.groupSize)),
+		replacements = SafeNumber(session.replacementCount),
 		bossCount = SafeNumber(sample.bossCount),
 		wipes = SafeNumber(sample.wipes),
 		completionPath = sample.completionPath,
@@ -4248,7 +4330,7 @@ local function BuildDiagnosticRecord(snapshot, reason)
 	end
 	local build, _, buildDate, interfaceVersion = GetBuildInfo()
 	return {
-		schemaVersion = 7,
+		schemaVersion = 8,
 		healerFormulaVersion = GetSnapshotHealerFormulaVersion(snapshot),
 		tankFormulaVersion = snapshot.tankFormulaVersion or TANK_SCORE_VERSION,
 		addonVersion = API and API.VERSION or "?",
@@ -4277,6 +4359,11 @@ local function BuildDiagnosticRecord(snapshot, reason)
 		sampleTotals = snapshot.sampleTotals,
 		rows = snapshot.rows,
 		formula = {
+			roster = {
+				activeMembersOnly = true,
+				departedPlayersPurgedOnReplacement = true,
+				replacementGraceSeconds = ROSTER_REPLACEMENT_GRACE,
+			},
 			solo = {
 				stability = 0.25,
 				coverage = 0.20,

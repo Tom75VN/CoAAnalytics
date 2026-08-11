@@ -39,8 +39,9 @@ local function BuildShareMessages(snapshot)
 	end
 
 	local messages = {
-		API.LocalizeText("CoA Analytics - Groupe ")
+		"CoA Analytics - Party Score: "
 			.. PvE.FormatRating(snapshot.averageRating) .. "/10",
+		"Role-based score: each player is evaluated for their assigned role.",
 	}
 	for index = 1, #snapshot.rows do
 		local data = snapshot.rows[index]
@@ -50,7 +51,7 @@ local function BuildShareMessages(snapshot)
 		end
 	end
 
-	if #messages <= 1 then
+	if #messages <= 2 then
 		return nil
 	end
 	return messages
