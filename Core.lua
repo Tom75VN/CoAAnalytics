@@ -739,44 +739,7 @@ local function InitializeRankingDatabase()
 	rankings.version = RANKING_DATABASE_VERSION
 end
 
-local function CopySavedValue(value, seen)
-	if type(value) ~= "table" then
-		return value
-	end
-	seen = seen or {}
-	if seen[value] then
-		return seen[value]
-	end
-	local copy = {}
-	seen[value] = copy
-	for key, child in pairs(value) do
-		copy[CopySavedValue(key, seen)] = CopySavedValue(child, seen)
-	end
-	return copy
-end
-
-local function ImportLegacyDatabase()
-	if type(CoAAnalyticsDB) == "table" then
-		return
-	end
-
-	-- The previous addon folder owns the historical SavedVariables file.
-	-- Load its tiny migration bridge once, then clone every setting and BG
-	-- ranking into the new CoA Analytics database.
-	if type(CoABGIntelligenceDB) ~= "table"
-		and type(LoadAddOn) == "function"
-	then
-		pcall(LoadAddOn, "CoABGIntelligence")
-	end
-	if type(CoABGIntelligenceDB) == "table" then
-		CoAAnalyticsDB = CopySavedValue(CoABGIntelligenceDB)
-		CoAAnalyticsDB.migratedFromCoABGIntelligence = true
-		CoAAnalyticsDB.migratedAtVersion = ADDON_VERSION
-	end
-end
-
 local function InitializeDatabase()
-	ImportLegacyDatabase()
 	if type(CoAAnalyticsDB) ~= "table" then
 		CoAAnalyticsDB = {}
 	end
@@ -1513,7 +1476,6 @@ CoAAnalyticsAPI.InitializeRankingDatabase = InitializeRankingDatabase
 CoAAnalyticsAddon.Modules.Core = CoAAnalyticsAPI
 
 SLASH_COAANALYTICS1 = "/coaa"
-SLASH_COAANALYTICS2 = "/coabgi"
 SlashCmdList.COAANALYTICS = function(message)
 	message = string.lower(message or "")
 	message = message:gsub("^%s+", ""):gsub("%s+$", "")
