@@ -18,11 +18,13 @@ local LOSS_GRACE = 1
 local MAX_NAMEPLATE_UNITS = 40
 local SESSION_SNAPSHOT_INTERVAL = 1
 local EPSILON = 0.000001
-local HEALER_SCORE_VERSION = 5
-local TANK_SCORE_VERSION = 3
+local HEALER_SCORE_VERSION = 6
+local TANK_SCORE_VERSION = 4
 local TANK_REFERENCE_PRIOR_SAMPLES = 5
+local TANK_EXACT_REFERENCE_MIN_SAMPLES = 3
 local DPS_PHASE_MIN_DAMAGE_SHARE = 0.03
 local DPS_PHASE_FULL_WEIGHT_SHARE = 0.20
+local DPS_PHASE_DAMAGE_SHARE_BLEND = 0.50
 local TANK_DAMAGE_BONUS_MAX = 2
 local TANK_HEALING_BONUS_MAX = 1
 local DIAGNOSTIC_MIN_COMBAT = 30
@@ -30,6 +32,9 @@ local DIAGNOSTIC_HISTORY_LIMIT = 10
 local MIN_SCORING_OBSERVED = 5
 local MIN_SCORING_PARTICIPATION = 0.05
 local URGENT_RECOVERY_THRESHOLD = 0.65
+local SUSTAINED_HEALING_PERIODIC_SHARE = 0.35
+local DIRECT_HEALER_CLEAN_RECOVERY_FLOOR = 0.95
+local SUSTAINED_HEALER_CLEAN_RECOVERY_FLOOR = 1.00
 local DIAGNOSTIC_FILE_PATH = "WTF\\Account\\<compte>\\SavedVariables\\CoAAnalytics.lua"
 -- Le niveau n'est qu'un indicateur de puissance : l'equipement et la build
 -- restent importants. Cette courbe volontairement prudente corrige l'ecart
@@ -37,6 +42,15 @@ local DIAGNOSTIC_FILE_PATH = "WTF\\Account\\<compte>\\SavedVariables\\CoAAnalyti
 local LEVEL_POWER_EXPONENT = 1.50
 local LEVEL_FACTOR_MIN = 0.65
 local LEVEL_FACTOR_MAX = 1.55
+
+-- Ces profils utilisent volontairement des soins progressifs. La detection
+-- par specialisation donne le bon comportement des le premier soin, tandis
+-- que la part periodique mesuree couvre aussi les builds hybrides ou futurs.
+local SUSTAINED_HEALER_SPECIALIZATIONS = {
+	["CHRONOMANCER:31"] = true, -- Time
+	["PROPHET:101"] = true, -- Vizier (jeton de classe actuel)
+	["VENOMANCER:101"] = true, -- compatibilite d'identite
+}
 
 local driver = CreateFrame("Frame")
 local session
@@ -83,6 +97,30 @@ local function SafeNumber(value)
 		return 0
 	end
 	return value
+end
+
+local function GetHealerRecoveryProfile(participant)
+	local data = participant and (
+		participant.data or participant.member and participant.member.data
+	) or {}
+	local stats = participant and participant.stats or {}
+	local classToken = data.specializationClassToken or data.classToken
+	local specializationID = tonumber(data.specializationID)
+	local identity = classToken and specializationID
+		and tostring(classToken) .. ":" .. tostring(specializationID) or nil
+	local effectiveHealing = SafeNumber(stats.effectiveHealing)
+	local periodicShare = effectiveHealing > 0
+		and Clamp(
+			SafeNumber(stats.periodicHealing) / effectiveHealing,
+			0,
+			1
+		) or 0
+	if identity and SUSTAINED_HEALER_SPECIALIZATIONS[identity]
+		or periodicShare >= SUSTAINED_HEALING_PERIODIC_SHARE
+	then
+		return "sustained", periodicShare
+	end
+	return "direct", periodicShare
 end
 
 local function CopyCoordinates(coordinates)
@@ -376,10 +414,16 @@ local function NewStats(member)
 		petDamage = 0,
 		directDamageEvents = 0,
 		petDamageEvents = 0,
+		petBossDamage = 0,
+		petTrashDamage = 0,
+		damagingPetCount = 0,
+		damagingPets = {},
 		bossDamage = 0,
 		trashDamage = 0,
 		rawHealing = 0,
 		effectiveHealing = 0,
+		periodicRawHealing = 0,
+		periodicHealing = 0,
 		directHealing = 0,
 		petHealing = 0,
 		absorbs = 0,
@@ -862,6 +906,37 @@ local function BuildContextKey(sample, suffix)
 	}, "|")
 end
 
+local function GetBroadTankReference(category, sample, suffix)
+	if not category or type(category.contexts) ~= "table" then
+		return
+	end
+	local aggregate = { samples = 0 }
+	for contextKey, context in pairs(category.contexts) do
+		if type(contextKey) == "string" and type(context) == "table"
+		then
+			local kind, _, _, difficultyID, groupSize, contextSuffix =
+				string.match(
+					contextKey,
+					"^([^|]*)|([^|]*)|([^|]*)|([^|]*)|([^|]*)|(.*)$"
+				)
+			if kind == tostring(sample.kind or "pve")
+				and difficultyID == tostring(sample.difficultyID or 0)
+				and groupSize == tostring(sample.groupSize or 0)
+				and contextSuffix == tostring(suffix or "base")
+			then
+				aggregate.samples = SafeNumber(aggregate.samples)
+					+ SafeNumber(context.samples)
+				aggregate.damageRateSum =
+					SafeNumber(aggregate.damageRateSum)
+					+ SafeNumber(context.damageRateSum)
+				aggregate.spikeSum = SafeNumber(aggregate.spikeSum)
+					+ SafeNumber(context.spikeSum)
+			end
+		end
+	end
+	return SafeNumber(aggregate.samples) > 0 and aggregate or nil
+end
+
 local function SnapshotParticipants(sample)
 	local participants = {}
 	local rosterSize = 0
@@ -1085,6 +1160,23 @@ local function GetDpsWeights(sample, bossMean, trashMean, players)
 	if not trashReliable then
 		bossWeight = bossReliable and 1 or 0
 	end
+	local strategicWeightTotal = bossWeight + trashWeight
+	local strategicBossWeight = strategicWeightTotal > 0
+		and bossWeight / strategicWeightTotal or 0
+	local strategicTrashWeight = strategicWeightTotal > 0
+		and trashWeight / strategicWeightTotal or 0
+	local reliableDamageTotal = (bossReliable and bossDamageShare or 0)
+		+ (trashReliable and trashDamageShare or 0)
+	if strategicWeightTotal > 0 and reliableDamageTotal > 0 then
+		local damageBossWeight = bossReliable
+			and bossDamageShare / reliableDamageTotal or 0
+		local damageTrashWeight = trashReliable
+			and trashDamageShare / reliableDamageTotal or 0
+		bossWeight = (1 - DPS_PHASE_DAMAGE_SHARE_BLEND) * strategicBossWeight
+			+ DPS_PHASE_DAMAGE_SHARE_BLEND * damageBossWeight
+		trashWeight = (1 - DPS_PHASE_DAMAGE_SHARE_BLEND) * strategicTrashWeight
+			+ DPS_PHASE_DAMAGE_SHARE_BLEND * damageTrashWeight
+	end
 	return bossWeight, trashWeight, {
 		bossReliable = bossReliable and true or false,
 		trashReliable = trashReliable and true or false,
@@ -1097,6 +1189,9 @@ local function GetDpsWeights(sample, bossMean, trashMean, players)
 		bossStrength = bossStrength,
 		trashStrength = trashStrength,
 		minimumPhaseTime = minimumPhaseTime,
+		strategicBossWeight = strategicBossWeight,
+		strategicTrashWeight = strategicTrashWeight,
+		damageShareBlend = DPS_PHASE_DAMAGE_SHARE_BLEND,
 	}
 end
 
@@ -1586,12 +1681,27 @@ local function CalculateHealerOutcome(
 		1,
 		1.35
 	)
+	local recoveryProfile, periodicHealingShare =
+		GetHealerRecoveryProfile(participant)
+	local cleanRecoveryOutcome = context.urgentRecoveryFailures <= 0
+		and context.criticalFailures <= 0
+		and context.preventableDeaths <= 0
+	local responsivenessFloor = 0
+	if cleanRecoveryOutcome then
+		responsivenessFloor = recoveryProfile == "sustained"
+			and SUSTAINED_HEALER_CLEAN_RECOVERY_FLOOR
+			or DIRECT_HEALER_CLEAN_RECOVERY_FLOOR
+	end
+	local responsiveness = math.max(
+		context.responsiveness,
+		responsivenessFloor
+	)
 	local rawScore
 	if healerCount <= 1 then
 		rawScore = 100 * (
 			0.25 * context.stability
 				+ 0.20 * coverage
-				+ 0.20 * context.responsiveness
+				+ 0.20 * responsiveness
 				+ 0.20 * availability
 				+ 0.08 * manaManagement
 				+ 0.05 * prevention
@@ -1602,7 +1712,7 @@ local function CalculateHealerOutcome(
 			0.25 * Clamp(peer, 0.40, 1.60)
 				+ 0.15 * coverage
 				+ 0.15 * context.stability
-				+ 0.15 * context.responsiveness
+				+ 0.15 * responsiveness
 				+ 0.15 * availability
 				+ 0.08 * manaManagement
 				+ 0.05 * prevention
@@ -1619,7 +1729,12 @@ local function CalculateHealerOutcome(
 		peer = peer,
 		coverage = coverage,
 		stability = context.stability,
-		responsiveness = context.responsiveness,
+		responsiveness = responsiveness,
+		baseResponsiveness = context.responsiveness,
+		responsivenessFloor = responsivenessFloor,
+		recoveryProfile = recoveryProfile,
+		periodicHealingShare = periodicHealingShare,
+		cleanRecoveryOutcome = cleanRecoveryOutcome,
 		efficiency = efficiency,
 		effectiveRatio = effectiveRatio,
 		manaManagement = manaManagement,
@@ -1845,10 +1960,8 @@ local function AddTankRanking(root, scope, sample, participants)
 		participants, activeTime
 	)
 	totalGroupHealing = totalGroupHealing + SafeNumber(sample.unattributedAbsorb)
-	local contextKey = BuildContextKey(
-		sample,
-		"tanks=" .. GetEffectiveRoleCount(tanks, activeTime)
-	)
+	local tankContextSuffix = "tanks=" .. GetEffectiveRoleCount(tanks, activeTime)
+	local contextKey = BuildContextKey(sample, tankContextSuffix)
 	for _, participant in ipairs(tanks) do
 		local stats = participant.stats
 		local responsibility = math.max(1, SafeNumber(stats.responsibilitySeconds))
@@ -2408,11 +2521,26 @@ local function RecordDamage(
 				else
 					stats.petDamage = SafeNumber(stats.petDamage) + amount
 					stats.petDamageEvents = SafeNumber(stats.petDamageEvents) + 1
+					stats.damagingPets = type(stats.damagingPets) == "table"
+						and stats.damagingPets or {}
+					if sourceGUID and not stats.damagingPets[sourceGUID] then
+						stats.damagingPets[sourceGUID] = true
+						stats.damagingPetCount =
+							SafeNumber(stats.damagingPetCount) + 1
+					end
 				end
 				if session.encounter then
 					stats.bossDamage = stats.bossDamage + amount
+					if sourceGUID ~= sourceOwner then
+						stats.petBossDamage =
+							SafeNumber(stats.petBossDamage) + amount
+					end
 				else
 					stats.trashDamage = stats.trashDamage + amount
+					if sourceGUID ~= sourceOwner then
+						stats.petTrashDamage =
+							SafeNumber(stats.petTrashDamage) + amount
+					end
 				end
 			end
 		elseif not sourceOwner and not destOwner
@@ -2448,7 +2576,13 @@ local function RecordDamage(
 	end)
 end
 
-local function RecordHealing(sourceGUID, destGUID, amount, overhealing)
+local function RecordHealing(
+	sourceGUID,
+	destGUID,
+	amount,
+	overhealing,
+	isPeriodic
+)
 	if not session or amount <= 0 then
 		return
 	end
@@ -2470,6 +2604,12 @@ local function RecordHealing(sourceGUID, destGUID, amount, overhealing)
 		if sourceStats then
 			sourceStats.rawHealing = sourceStats.rawHealing + amount
 			sourceStats.effectiveHealing = sourceStats.effectiveHealing + effective
+			if isPeriodic then
+				sourceStats.periodicRawHealing =
+					SafeNumber(sourceStats.periodicRawHealing) + amount
+				sourceStats.periodicHealing =
+					SafeNumber(sourceStats.periodicHealing) + effective
+			end
 			if sourceGUID == sourceOwner then
 				sourceStats.directHealing = SafeNumber(sourceStats.directHealing)
 					+ effective
@@ -2714,7 +2854,13 @@ local function ParseCombatLog(...)
 	elseif subevent == "SPELL_HEAL" or subevent == "SPELL_PERIODIC_HEAL" then
 		local amount = SafeNumber(select(extraIndex + 3, ...))
 		local overhealing = SafeNumber(select(extraIndex + 4, ...))
-		RecordHealing(sourceGUID, destGUID, amount, overhealing)
+		RecordHealing(
+			sourceGUID,
+			destGUID,
+			amount,
+			overhealing,
+			subevent == "SPELL_PERIODIC_HEAL"
+		)
 	elseif subevent == "SPELL_ABSORBED" then
 		local absorberGUID
 		local amount = 0
@@ -3415,8 +3561,10 @@ end
 
 local CURRENT_STAT_KEYS = {
 	"damage", "directDamage", "petDamage", "directDamageEvents",
-	"petDamageEvents", "bossDamage", "trashDamage", "rawHealing",
-	"effectiveHealing", "directHealing", "petHealing", "absorbs",
+	"petDamageEvents", "petBossDamage", "petTrashDamage",
+	"damagingPetCount", "bossDamage", "trashDamage", "rawHealing",
+	"effectiveHealing", "periodicRawHealing", "periodicHealing",
+	"directHealing", "petHealing", "absorbs",
 	"directAbsorbs", "petAbsorbs", "summonCount", "tankTargetHealing",
 	"damageTaken", "tankDamage",
 	"externalSupport", "deaths", "responsibilitySeconds", "controlledSeconds",
@@ -3619,6 +3767,9 @@ BuildCurrentDungeonSnapshot = function(finished)
 			directDamage = SafeNumber(stats.directDamage),
 			petDamage = SafeNumber(stats.petDamage),
 			petDamageEvents = SafeNumber(stats.petDamageEvents),
+			petBossDamage = SafeNumber(stats.petBossDamage),
+			petTrashDamage = SafeNumber(stats.petTrashDamage),
+			damagingPetCount = SafeNumber(stats.damagingPetCount),
 			petDamageShare = SafeNumber(stats.damage) > 0
 				and SafeNumber(stats.petDamage) / SafeNumber(stats.damage) or 0,
 			summonCount = SafeNumber(stats.summonCount),
@@ -3626,6 +3777,10 @@ BuildCurrentDungeonSnapshot = function(finished)
 			healing = impact,
 			directHealing = SafeNumber(stats.directHealing),
 			petHealing = SafeNumber(stats.petHealing),
+			periodicHealing = SafeNumber(stats.periodicHealing),
+			periodicHealingShare = SafeNumber(stats.effectiveHealing) > 0
+				and SafeNumber(stats.periodicHealing)
+					/ SafeNumber(stats.effectiveHealing) or 0,
 			petAbsorbs = SafeNumber(stats.petAbsorbs),
 			hps = activeTime > 0 and impact / activeTime or 0,
 			damageTaken = SafeNumber(stats.damageTaken),
@@ -3743,6 +3898,9 @@ BuildCurrentDungeonSnapshot = function(finished)
 					trashContributors = phaseEvidence.trashContributors,
 					bossEvidenceStrength = phaseEvidence.bossStrength,
 					trashEvidenceStrength = phaseEvidence.trashStrength,
+					strategicBossWeight = phaseEvidence.strategicBossWeight,
+					strategicTrashWeight = phaseEvidence.strategicTrashWeight,
+					damageShareBlend = phaseEvidence.damageShareBlend,
 					minimumPhaseTime = phaseEvidence.minimumPhaseTime,
 					participation = participation,
 					bossParticipation = participant.bossParticipation,
@@ -3783,11 +3941,29 @@ BuildCurrentDungeonSnapshot = function(finished)
 	if activeTime >= 3 and #tanks > 0 then
 		local root = InitializeDatabase()
 		local tankCategory = root and EnsureCategory(root, "dungeon", "tank")
-		local contextKey = BuildContextKey(
+		local tankContextSuffix = "tanks="
+			.. GetEffectiveRoleCount(tanks, activeTime)
+		local contextKey = BuildContextKey(sample, tankContextSuffix)
+		local exactReference = tankCategory
+			and tankCategory.contexts[contextKey]
+		local broadReference = tankCategory and GetBroadTankReference(
+			tankCategory,
 			sample,
-			"tanks=" .. GetEffectiveRoleCount(tanks, activeTime)
+			tankContextSuffix
 		)
-		local reference = tankCategory and tankCategory.contexts[contextKey]
+		local exactReferenceSamples = exactReference
+			and SafeNumber(exactReference.samples) or 0
+		local broadReferenceSamples = broadReference
+			and SafeNumber(broadReference.samples) or 0
+		local reference = exactReferenceSamples
+			>= TANK_EXACT_REFERENCE_MIN_SAMPLES and exactReference
+			or broadReferenceSamples > 0 and broadReference
+			or exactReference
+		local referenceSource = reference == exactReference
+			and exactReferenceSamples > 0 and "instance"
+			or reference == broadReference and broadReferenceSamples > 0
+				and "broad"
+			or "fallback"
 		local totalGroupDamage, totalGroupHealing = GetGroupOutputTotals(
 			eligibleParticipants, activeTime
 		)
@@ -3846,6 +4022,9 @@ BuildCurrentDungeonSnapshot = function(finished)
 					spikeResilience = spikeResilience,
 					referenceSamples = referenceSamples,
 					referenceConfidence = referenceConfidence,
+					referenceSource = referenceSource,
+					exactReferenceSamples = exactReferenceSamples,
+					broadReferenceSamples = broadReferenceSamples,
 					fallbackResilience = fallbackResilience,
 					survival = tankSurvival,
 					scorableDeaths = scorableDeaths,
@@ -4069,7 +4248,7 @@ local function BuildDiagnosticRecord(snapshot, reason)
 	end
 	local build, _, buildDate, interfaceVersion = GetBuildInfo()
 	return {
-		schemaVersion = 6,
+		schemaVersion = 7,
 		healerFormulaVersion = GetSnapshotHealerFormulaVersion(snapshot),
 		tankFormulaVersion = snapshot.tankFormulaVersion or TANK_SCORE_VERSION,
 		addonVersion = API and API.VERSION or "?",
@@ -4108,6 +4287,13 @@ local function BuildDiagnosticRecord(snapshot, reason)
 				overhealInfluence = 0.02,
 				urgentRecoveryThreshold = URGENT_RECOVERY_THRESHOLD,
 				noFailureResponsivenessFloor = 0.85,
+				directCleanRecoveryFloor =
+					DIRECT_HEALER_CLEAN_RECOVERY_FLOOR,
+				sustainedCleanRecoveryFloor =
+					SUSTAINED_HEALER_CLEAN_RECOVERY_FLOOR,
+				sustainedPeriodicHealingShare =
+					SUSTAINED_HEALING_PERIODIC_SHARE,
+				classAwareRecoveryProfiles = true,
 			},
 			dps = {
 				adaptiveBossWeight = true,
@@ -4116,11 +4302,14 @@ local function BuildDiagnosticRecord(snapshot, reason)
 				unreliablePhasesIgnored = true,
 				minimumPhaseShare = DPS_PHASE_MIN_DAMAGE_SHARE,
 				fullPhaseWeightShare = DPS_PHASE_FULL_WEIGHT_SHARE,
+				damageShareBlend = DPS_PHASE_DAMAGE_SHARE_BLEND,
 				evidenceWeightedPhases = true,
 				inactivePlayersExcluded = true,
 				phaseParticipationAdjusted = true,
 				petDamageAttributed = true,
 				petDamageSeparatedInDiagnostics = true,
+				petPhaseDamageSeparatedInDiagnostics = true,
+				damagingPetCountTracked = true,
 				unattributedFriendlyDamageTracked = true,
 			},
 			tank = {
@@ -4133,6 +4322,9 @@ local function BuildDiagnosticRecord(snapshot, reason)
 				healingBonusMaximum = TANK_HEALING_BONUS_MAX,
 				contributionRequiresRoleExecution = true,
 				referencePriorSamples = TANK_REFERENCE_PRIOR_SAMPLES,
+				exactReferenceMinimumSamples =
+					TANK_EXACT_REFERENCE_MIN_SAMPLES,
+				broadNormalizedReference = true,
 				coldStartResilienceFallback = true,
 				externalSupportScored = false,
 			},
