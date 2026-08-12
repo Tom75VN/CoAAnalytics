@@ -10,6 +10,9 @@ local HEADER_HEIGHT = 27
 local BOSS_PANEL_HEIGHT = 48
 local ROW_HEIGHT = 21
 local MAX_ROWS = 10
+local ROUTE_DRAWER_WIDTH = 270
+local ROUTE_ROW_HEIGHT = 18
+local MAX_ROUTE_ROWS = 10
 
 local addonDB
 local frame
@@ -21,11 +24,17 @@ local bossNameButton
 local bossNameText
 local bossShareButton
 local bossLocateButton
+local routeButton
+local routeDrawer
+local routeTitleText
+local routeNoteText
+local routeDrawerOpen = false
 local shareSenderFrame
 local shareQueue
 local shareChannel
 local shareElapsed = 0
 local rows = {}
+local routeRows = {}
 
 local SHARE_INTERVAL = 0.35
 
@@ -185,6 +194,41 @@ local function SavePosition()
 	}
 end
 
+local function ApplyRouteDrawerAnchor()
+	if not routeDrawer or not frame then
+		return
+	end
+	routeDrawer:ClearAllPoints()
+	local frameCenter = frame:GetCenter()
+	local screenWidth = UIParent and UIParent:GetWidth() or 0
+	if frameCenter and screenWidth > 0 and frameCenter > screenWidth / 2 then
+		routeDrawer:SetPoint("TOPRIGHT", frame, "TOPLEFT", -4, 0)
+	else
+		routeDrawer:SetPoint("TOPLEFT", frame, "TOPRIGHT", 4, 0)
+	end
+end
+
+local function SetRouteDrawerOpen(open)
+	routeDrawerOpen = open and true or false
+	if routeButton then
+		routeButton:SetNormalTexture(routeDrawerOpen
+			and "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up"
+			or "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up")
+		routeButton:SetPushedTexture(routeDrawerOpen
+			and "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Down"
+			or "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down")
+	end
+	if not routeDrawer then
+		return
+	end
+	if routeDrawerOpen and routeDrawer.info then
+		ApplyRouteDrawerAnchor()
+		routeDrawer:Show()
+	else
+		routeDrawer:Hide()
+	end
+end
+
 local function CreateRow(index)
 	local row = CreateFrame("Frame", nil, frame)
 	row:SetHeight(ROW_HEIGHT)
@@ -296,6 +340,91 @@ local function CreateOverlay()
 		GameTooltip:Hide()
 	end)
 
+	routeButton = CreateFrame("Button", nil, frame)
+	routeButton:SetWidth(18)
+	routeButton:SetHeight(18)
+	routeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -84, -4)
+	routeButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+	routeButton:SetScript("OnClick", function()
+		SetRouteDrawerOpen(not routeDrawerOpen)
+	end)
+	routeButton:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:AddLine("Ordre requis des boss", 1, 0.74, 0.16)
+		GameTooltip:AddLine(
+			"Ouvre la liste des boss et mecanismes obligatoires avant le boss final.",
+			0.78, 0.82, 0.90,
+			true
+		)
+		GameTooltip:Show()
+	end)
+	routeButton:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	routeButton:Hide()
+	SetRouteDrawerOpen(false)
+
+	routeDrawer = CreateFrame("Frame", nil, frame)
+	routeDrawer:SetWidth(ROUTE_DRAWER_WIDTH)
+	routeDrawer:SetHeight(80)
+	routeDrawer:SetFrameLevel(frame:GetFrameLevel() + 2)
+	routeDrawer:SetBackdrop({
+		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true,
+		tileSize = 16,
+		edgeSize = 12,
+		insets = { left = 3, right = 3, top = 3, bottom = 3 },
+	})
+	routeDrawer:SetBackdropColor(0.025, 0.03, 0.04, 0.96)
+	routeDrawer:SetBackdropBorderColor(0.95, 0.67, 0.12, 0.92)
+	ApplyRouteDrawerAnchor()
+
+	routeTitleText = routeDrawer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	routeTitleText:SetPoint("TOPLEFT", routeDrawer, "TOPLEFT", 10, -9)
+	routeTitleText:SetPoint("TOPRIGHT", routeDrawer, "TOPRIGHT", -28, -9)
+	routeTitleText:SetJustifyH("LEFT")
+	routeTitleText:SetText("Ordre requis des boss")
+	routeTitleText:SetTextColor(1, 0.74, 0.16)
+
+	local routeCloseButton = CreateFrame("Button", nil, routeDrawer, "UIPanelCloseButton")
+	routeCloseButton:SetWidth(24)
+	routeCloseButton:SetHeight(24)
+	routeCloseButton:SetPoint("TOPRIGHT", routeDrawer, "TOPRIGHT", 1, 1)
+	routeCloseButton:SetScript("OnClick", function()
+		SetRouteDrawerOpen(false)
+	end)
+
+	routeNoteText = routeDrawer:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	routeNoteText:SetPoint("TOPLEFT", routeDrawer, "TOPLEFT", 10, -29)
+	routeNoteText:SetWidth(ROUTE_DRAWER_WIDTH - 20)
+	routeNoteText:SetHeight(30)
+	routeNoteText:SetJustifyH("LEFT")
+	routeNoteText:SetJustifyV("TOP")
+	routeNoteText:SetWordWrap(true)
+
+	for index = 1, MAX_ROUTE_ROWS do
+		local routeRow = routeDrawer:CreateFontString(
+			nil,
+			"OVERLAY",
+			"GameFontHighlightSmall"
+		)
+		routeRow:SetPoint(
+			"TOPLEFT",
+			routeDrawer,
+			"TOPLEFT",
+			12,
+			-63 - (index - 1) * ROUTE_ROW_HEIGHT
+		)
+		routeRow:SetWidth(ROUTE_DRAWER_WIDTH - 24)
+		routeRow:SetHeight(ROUTE_ROW_HEIGHT)
+		routeRow:SetJustifyH("LEFT")
+		routeRow:SetJustifyV("MIDDLE")
+		routeRow:SetWordWrap(false)
+		routeRows[index] = routeRow
+	end
+	routeDrawer:Hide()
+
 	bossPanel = CreateFrame("Frame", nil, frame)
 	bossPanel:SetHeight(BOSS_PANEL_HEIGHT)
 	bossPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 5, -HEADER_HEIGHT)
@@ -406,6 +535,9 @@ local function UpdateBossPanel(info)
 	if not info then
 		bossPanel.info = nil
 		bossPanel:Hide()
+		routeButton:Hide()
+		routeDrawer.info = nil
+		SetRouteDrawerOpen(false)
 		return 0
 	end
 	bossPanel.info = info
@@ -421,6 +553,38 @@ local function UpdateBossPanel(info)
 	end
 	bossPanel:Show()
 	return BOSS_PANEL_HEIGHT
+end
+
+local function UpdateRouteDrawer(info)
+	local route = info and (
+		API.GetLanguage() == "en" and info.routeEn or info.routeFr
+	) or nil
+	if type(route) ~= "table" or #route == 0 then
+		routeButton:Hide()
+		routeDrawer.info = nil
+		SetRouteDrawerOpen(false)
+		return
+	end
+	routeDrawer.info = info
+	routeButton:Show()
+	routeTitleText:SetText("Ordre requis des boss")
+	routeNoteText:SetText(API.GetLanguage() == "en"
+		and tostring(info.routeNoteEn or "")
+		or tostring(info.routeNoteFr or ""))
+	for index = 1, MAX_ROUTE_ROWS do
+		local value = route[index]
+		if value then
+			routeRows[index]:SetText(tostring(index) .. ". " .. tostring(value))
+			routeRows[index]:Show()
+		else
+			routeRows[index]:Hide()
+		end
+	end
+	routeDrawer:SetHeight(70 + math.min(#route, MAX_ROUTE_ROWS) * ROUTE_ROW_HEIGHT)
+	if routeDrawerOpen then
+		ApplyRouteDrawerAnchor()
+		routeDrawer:Show()
+	end
 end
 
 local function UpdateRows(snapshot, bossPanelHeight)
@@ -495,6 +659,7 @@ function Overlay.Refresh(snapshot)
 	local bossInfo = bossModule and bossModule.GetCurrent
 		and bossModule.GetCurrent()
 	local bossHeight = UpdateBossPanel(bossInfo)
+	UpdateRouteDrawer(bossInfo)
 	UpdateRows(snapshot, bossHeight)
 	local instanceName = snapshot and snapshot.instanceName
 		or bossInfo and bossInfo.dungeon

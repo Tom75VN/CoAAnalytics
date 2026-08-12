@@ -7,14 +7,13 @@ A performance analysis addon for World of Warcraft: Ascension.
 - Battleground rankings for specializations and players
 - Role-based scoring for dungeons and raids
 - Live dungeon performance ratings
-- Automatic Mythic 0 Keystone boss identification, route hints, and party sharing
+- Mythic 0 Keystone boss identification, required boss-order drawer, and English party sharing
 - Pet, guardian, healing, threat, and utility tracking
 - English and French interface
 
 In a recognized Mythic 0 dungeon, the live performance widget shows the
-Keystone boss. Use its target button to target and mark a nearby loaded boss,
-or to print the route hint when dungeon coordinates are unavailable. Use the
-share button (or /coaa boss share) to send the boss and route to the group.
+Keystone boss. Its drawer lists mandatory progression when the final boss is
+locked. The share button (or `/coaa boss share`) always posts in English.
 
 ## Installation
 

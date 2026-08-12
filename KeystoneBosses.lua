@@ -16,6 +16,18 @@ local DUNGEONS = {
 		aliases = { "Wailing Caverns", "Cavernes des lamentations" },
 		hintFr = "Tuez les quatre Seigneurs du Croc, puis terminez l'escorte du Disciple de Naralex; Mutanus est la derniere embuscade.",
 		hintEn = "Kill the four Fanglords, then finish the Disciple of Naralex escort; Mutanus is the final ambush.",
+		routeNoteFr = "Ordre de route conseille; les quatre Seigneurs du Croc sont obligatoires.",
+		routeNoteEn = "Recommended route order; all four Fanglords are required.",
+		routeFr = {
+			"Lady Anacondra", "Lord Cobrahn", "Lord Pythas",
+			"Lord Serpentis", "Escorte du Disciple de Naralex",
+			"Mutanus the Devourer",
+		},
+		routeEn = {
+			"Lady Anacondra", "Lord Cobrahn", "Lord Pythas",
+			"Lord Serpentis", "Disciple of Naralex escort",
+			"Mutanus the Devourer",
+		},
 	},
 	{
 		dungeon = "The Deadmines", boss = "Edwin VanCleef",
@@ -40,6 +52,16 @@ local DUNGEONS = {
 		aliases = { "Blackfathom Deeps", "Profondeurs de Brassenoire" },
 		hintFr = "Dans la derniere caverne du sanctuaire, au-dela des ruines et de l'autel d'Aku'mai.",
 		hintEn = "In the shrine's final cavern, beyond the ruins and Aku'mai's altar.",
+		routeNoteFr = "L'evenement des quatre flammes ouvre la porte d'Aku'mai.",
+		routeNoteEn = "The four-flame event opens Aku'mai's door.",
+		routeFr = {
+			"Twilight Lord Kelris", "Allumer les quatre flammes",
+			"Vaincre les vagues de l'evenement", "Aku'mai",
+		},
+		routeEn = {
+			"Twilight Lord Kelris", "Light all four flames",
+			"Defeat the event waves", "Aku'mai",
+		},
 	},
 	{
 		dungeon = "Gnomeregan", boss = "Mekgineer Thermaplugg",
@@ -76,6 +98,16 @@ local DUNGEONS = {
 		aliases = { "Scarlet Cathedral", "Scarlet Monastery - Cathedral", "The Cathedral", "Monastere ecarlate - Cathedrale" },
 		hintFr = "Dans la chapelle finale. Tuez Mograine pour faire apparaitre Whitemane, puis terminez leur combat combine.",
 		hintEn = "In the final chapel. Defeat Mograine to make Whitemane appear, then finish their combined encounter.",
+		routeNoteFr = "Les deux phases appartiennent au meme combat final.",
+		routeNoteEn = "Both phases belong to the same final encounter.",
+		routeFr = {
+			"Scarlet Commander Mograine", "High Inquisitor Whitemane",
+			"Mograine ressuscite + Whitemane",
+		},
+		routeEn = {
+			"Scarlet Commander Mograine", "High Inquisitor Whitemane",
+			"Resurrected Mograine + Whitemane",
+		},
 	},
 	{
 		dungeon = "Razorfen Downs", boss = "Amnennar the Coldbringer",
@@ -118,6 +150,18 @@ local DUNGEONS = {
 		aliases = { "Sunken Temple", "The Sunken Temple", "Temple of Atal'Hakkar", "Temple of Atal Hakkar", "Temple englouti", "Temple d'Atal'Hakkar" },
 		hintFr = "Dans la grande chambre inferieure centrale, apres avoir ouvert la voie dans le temple.",
 		hintEn = "In the large lower central chamber after opening the route through the temple.",
+		routeNoteFr = "Les six Defenseurs atal'ai peuvent etre tues dans n'importe quel ordre.",
+		routeNoteEn = "The six Atal'ai Defenders can be killed in any order.",
+		routeFr = {
+			"Gasher", "Hukku", "Loro", "Mijan", "Zolo", "Zul'Lor",
+			"Jammal'an the Prophet + Ogom the Wretched",
+			"Shade of Eranikus",
+		},
+		routeEn = {
+			"Gasher", "Hukku", "Loro", "Mijan", "Zolo", "Zul'Lor",
+			"Jammal'an the Prophet + Ogom the Wretched",
+			"Shade of Eranikus",
+		},
 	},
 	{
 		dungeon = "Blackrock Depths", boss = "Emperor Dagran Thaurissan",
@@ -154,12 +198,32 @@ local DUNGEONS = {
 		aliases = { "Dire Maul West", "Dire Maul - West", "Capital Gardens", "Hache Tripes Ouest" },
 		hintFr = "Dans l'Athenaeum. Desactivez les pylones et battez Immol'thar pour ouvrir la route.",
 		hintEn = "In the Athenaeum. Disable the pylons and defeat Immol'thar to open the route.",
+		routeNoteFr = "Les cinq pylones doivent etre desactives avant Immol'thar.",
+		routeNoteEn = "All five pylons must be disabled before Immol'thar.",
+		routeFr = {
+			"Desactiver les cinq pylones", "Immol'thar", "Prince Tortheldrin",
+		},
+		routeEn = {
+			"Disable all five pylons", "Immol'thar", "Prince Tortheldrin",
+		},
 	},
 	{
 		dungeon = "Scholomance", boss = "Darkmaster Gandling",
 		aliases = { "Scholomance" },
 		hintFr = "Dans le Bureau du Directeur; terminez les six salles d'etude pour le faire apparaitre.",
 		hintEn = "In the Headmaster's Study; clear all six study rooms to make him appear.",
+		routeNoteFr = "Ordre conseille: trois salles du bas, puis trois salles du haut. Nettoyez aussi les humanoides requis des salles.",
+		routeNoteEn = "Recommended order: three lower rooms, then three upper rooms. Also clear the required humanoids inside the rooms.",
+		routeFr = {
+			"The Ravenian", "Lord Alexei Barov", "Lady Illucia Barov",
+			"Instructor Malicia", "Doctor Theolen Krastinov",
+			"Lorekeeper Polkelt", "Darkmaster Gandling",
+		},
+		routeEn = {
+			"The Ravenian", "Lord Alexei Barov", "Lady Illucia Barov",
+			"Instructor Malicia", "Doctor Theolen Krastinov",
+			"Lorekeeper Polkelt", "Darkmaster Gandling",
+		},
 	},
 	{
 		dungeon = "Stratholme - Main Gate", boss = "Balnazzar",
@@ -172,6 +236,18 @@ local DUNGEONS = {
 		aliases = { "Stratholme - Service Entrance", "Stratholme Service Entrance", "Stratholme - Undead", "The Gauntlet", "Slaughter Square", "Stratholme - Entree de service" },
 		hintFr = "Dans le Square du Massacre; fermez les ziggourats puis nettoyez les abominations pour ouvrir la porte.",
 		hintEn = "In Slaughter Square; clear the ziggurats and abominations to open his gate.",
+		routeNoteFr = "Videz les acolytes dans chaque ziggourat; les trois premiers boss peuvent varier selon la route.",
+		routeNoteEn = "Clear the acolytes inside each ziggurat; the first three bosses may be routed differently.",
+		routeFr = {
+			"Nerub'enkan + acolytes", "Baroness Anastari + acolytes",
+			"Maleki the Pallid + acolytes", "Tuer toutes les abominations",
+			"Ramstein the Gorger", "Baron Rivendare",
+		},
+		routeEn = {
+			"Nerub'enkan + acolytes", "Baroness Anastari + acolytes",
+			"Maleki the Pallid + acolytes", "Kill all abominations",
+			"Ramstein the Gorger", "Baron Rivendare",
+		},
 	},
 	{
 		dungeon = "Blackrock Caverns", boss = "Ascendant Lord Obsidius",
@@ -321,6 +397,7 @@ local function BuildCurrentInfo()
 			hint = API.GetLanguage() == "en"
 				and "This Mythic 0 dungeon is not identified in the local list."
 				or "Ce donjon Mythic 0 n'est pas identifie dans la liste locale.",
+			hintEn = "This Mythic 0 dungeon is not identified in the local list.",
 			difficultyID = difficultyID,
 			difficultyName = difficultyName,
 		}
@@ -331,6 +408,14 @@ local function BuildCurrentInfo()
 		boss = entry.boss,
 		bossAliases = entry.bossAliases,
 		hint = API.GetLanguage() == "en" and entry.hintEn or entry.hintFr,
+		hintEn = entry.hintEn,
+		route = API.GetLanguage() == "en" and entry.routeEn or entry.routeFr,
+		routeFr = entry.routeFr,
+		routeEn = entry.routeEn,
+		routeNote = API.GetLanguage() == "en"
+			and entry.routeNoteEn or entry.routeNoteFr,
+		routeNoteFr = entry.routeNoteFr,
+		routeNoteEn = entry.routeNoteEn,
 		difficultyID = difficultyID,
 		difficultyName = difficultyName,
 		index = entry.index,
@@ -404,8 +489,10 @@ function Module.ShareCurrent()
 		Notify(API.LocalizeText("aucun boss de Keystone a partager"))
 		return false
 	end
+	-- Party and raid chat must remain understandable regardless of the
+	-- language selected for the local addon UI.
 	local message = "Keystone Boss: " .. tostring(info.boss)
-		.. " - " .. tostring(info.hint)
+		.. " - " .. tostring(info.hintEn or info.hint)
 	local channel = GetShareChannel()
 	if channel and type(SendChatMessage) == "function" then
 		SendChatMessage(message, channel)

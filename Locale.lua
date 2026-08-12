@@ -90,6 +90,9 @@ local ENGLISH = {
 		"Targets the boss and marks it with a skull when loaded nearby. Otherwise, shows the available route.",
 	["Envoie le nom du boss et son itineraire au groupe."] =
 		"Sends the boss name and its route to the group.",
+	["Ordre requis des boss"] = "Required Boss Order",
+	["Ouvre la liste des boss et mecanismes obligatoires avant le boss final."] =
+		"Opens the bosses and mechanics required before the final boss.",
 	["aucun boss de Keystone a partager"] = "no Keystone boss to share",
 	["aucun boss de Keystone dans ce donjon"] = "no Keystone boss in this dungeon",
 	["est cible et marque s'il est a portee"] = "is targeted and marked when in range",
