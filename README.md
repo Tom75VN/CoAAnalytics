@@ -12,8 +12,9 @@ A performance analysis addon for World of Warcraft: Ascension.
 - English and French interface
 
 In a recognized Mythic 0 dungeon, the live performance widget shows the
-Keystone boss. Its drawer lists mandatory progression when the final boss is
-locked. The share button (or `/coaa boss share`) always posts in English.
+Keystone boss. Its drawer lists verified CoA objectives and clearly labels
+legacy routes that still need public CoA confirmation. The share button (or
+`/coaa boss share`) always posts in English.
 
 ## Installation
 
