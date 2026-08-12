@@ -1,5 +1,5 @@
 local ADDON_NAME = ...
-local ADDON_VERSION = CoAAnalyticsAddon and CoAAnalyticsAddon.VERSION or "2.16.1"
+local ADDON_VERSION = CoAAnalyticsAddon and CoAAnalyticsAddon.VERSION or "2.16.6"
 
 local ICON_SIZE = 18
 local ICON_OFFSET_Y = 3

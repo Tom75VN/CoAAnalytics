@@ -264,6 +264,7 @@ local DUNGEONS = {
 local current
 local initialized = false
 local lastAnnouncedSignature
+local mythicPlusRun = false
 local aliasLookup = {}
 
 local function IsEnabled()
@@ -319,17 +320,22 @@ local function GetLFGDungeonName()
 	end
 end
 
+local function IsKeystoneActive()
+	if type(C_MythicPlus) ~= "table"
+		or type(C_MythicPlus.IsKeystoneActive) ~= "function"
+	then
+		return false
+	end
+	local ok, active = pcall(C_MythicPlus.IsKeystoneActive)
+	return ok and active and true or false
+end
+
 local function IsMythicZero(instanceType, difficultyID, difficultyName)
 	if instanceType ~= "party" then
 		return false
 	end
-	if type(C_MythicPlus) == "table"
-		and type(C_MythicPlus.IsKeystoneActive) == "function"
-	then
-		local ok, active = pcall(C_MythicPlus.IsKeystoneActive)
-		if ok and active then
-			return false
-		end
+	if mythicPlusRun or IsKeystoneActive() then
+		return false
 	end
 	local normalizedDifficulty = Normalize(difficultyName)
 	return tonumber(difficultyID) == 3
@@ -461,7 +467,10 @@ function Module.Refresh()
 end
 
 function Module.GetCurrent()
-	return IsEnabled() and current or nil
+	if not IsEnabled() or mythicPlusRun or IsKeystoneActive() then
+		return nil
+	end
+	return current
 end
 
 function Module.GetDungeons()
@@ -485,7 +494,7 @@ local function GetShareChannel()
 end
 
 function Module.ShareCurrent()
-	if not IsEnabled() then
+	if not IsEnabled() or mythicPlusRun or IsKeystoneActive() then
 		return false
 	end
 	local info = current or Module.Refresh()
@@ -523,7 +532,7 @@ local function TargetMatchesBoss(info)
 end
 
 function Module.LocateCurrent()
-	if not IsEnabled() then
+	if not IsEnabled() or mythicPlusRun or IsKeystoneActive() then
 		return false
 	end
 	local info = current or Module.Refresh()
@@ -572,7 +581,38 @@ function Module.Initialize()
 end
 
 local eventFrame = CreateFrame("Frame")
+local function RegisterOptionalEvent(eventName)
+	pcall(eventFrame.RegisterEvent, eventFrame, eventName)
+end
+
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 eventFrame:RegisterEvent("LFG_UPDATE")
-eventFrame:SetScript("OnEvent", ScheduleRefresh)
+RegisterOptionalEvent("MYTHIC_PLUS_COUNTDOWN_STARTED")
+RegisterOptionalEvent("MYTHIC_PLUS_STARTED")
+RegisterOptionalEvent("MYTHIC_PLUS_COMPLETE")
+RegisterOptionalEvent("CHALLENGE_MODE_COMPLETED")
+eventFrame:SetScript("OnEvent", function(_, eventName)
+	if eventName == "MYTHIC_PLUS_COUNTDOWN_STARTED"
+		or eventName == "MYTHIC_PLUS_STARTED"
+		or eventName == "MYTHIC_PLUS_COMPLETE"
+		or eventName == "CHALLENGE_MODE_COMPLETED"
+	then
+		-- Difficulty ID 3 is shared by M0 and M+ on this client. Once a
+		-- Keystone countdown begins, keep the helper suppressed until the
+		-- player leaves or reloads the instance, even if the active-key API
+		-- briefly reports false during a transition.
+		mythicPlusRun = true
+		Module.Refresh()
+		return
+	end
+
+	if eventName == "PLAYER_ENTERING_WORLD"
+		or eventName == "ZONE_CHANGED_NEW_AREA"
+	then
+		local inInstance, instanceType = IsInInstance()
+		mythicPlusRun = inInstance and instanceType == "party"
+			and IsKeystoneActive() or false
+	end
+	ScheduleRefresh()
+end)
