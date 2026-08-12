@@ -2,11 +2,12 @@
 ## Title: CoA Analytics
 ## Notes: Analyse bilingue FR/EN des performances en BG, donjons et raids, avec suivi en temps reel.
 ## Author: OpenAI
-## Version: 2.15.6
+## Version: 2.16.1
 ## SavedVariables: CoAAnalyticsDB
 
 Namespace.lua
 Locale.lua
+KeystoneBosses.lua
 Core.lua
 BGRanking.lua
 Nameplates.lua

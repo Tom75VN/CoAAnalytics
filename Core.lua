@@ -1,5 +1,5 @@
 local ADDON_NAME = ...
-local ADDON_VERSION = CoAAnalyticsAddon and CoAAnalyticsAddon.VERSION or "2.15.3"
+local ADDON_VERSION = CoAAnalyticsAddon and CoAAnalyticsAddon.VERSION or "2.16.1"
 
 local ICON_SIZE = 18
 local ICON_OFFSET_Y = 3
@@ -779,6 +779,9 @@ local function InitializeDatabase()
 	if addonDB.showDungeonPerformanceOverlay == nil then
 		addonDB.showDungeonPerformanceOverlay = true
 	end
+	if addonDB.enableKeystoneBossFeature == nil then
+		addonDB.enableKeystoneBossFeature = true
+	end
 	if type(addonDB.dungeonOverlayPosition) ~= "table" then
 		addonDB.dungeonOverlayPosition = nil
 	end
@@ -1277,6 +1280,11 @@ driver:SetScript("OnEvent", function(_, event, value)
 		if CoAAnalyticsAddon.Modules.UI and CoAAnalyticsAddon.Modules.UI.Initialize then
 			CoAAnalyticsAddon.Modules.UI.Initialize()
 		end
+		if CoAAnalyticsAddon.Modules.KeystoneBosses
+			and CoAAnalyticsAddon.Modules.KeystoneBosses.Initialize
+		then
+			CoAAnalyticsAddon.Modules.KeystoneBosses.Initialize()
+		end
 		if CoAAnalyticsAddon.Modules.DungeonOverlay
 			and CoAAnalyticsAddon.Modules.DungeonOverlay.Initialize
 		then
@@ -1505,6 +1513,18 @@ SlashCmdList.COAANALYTICS = function(message)
 		or message == "pve performance"
 	then
 		if CoAAnalyticsAddon.Modules.UI then CoAAnalyticsAddon.Modules.UI.Open("pvesession") end
+	elseif message == "boss" or message == "keystone boss" then
+		local module = CoAAnalyticsAddon.Modules.KeystoneBosses
+		if module then
+			module.Refresh()
+			module.LocateCurrent()
+		end
+	elseif message == "boss share" or message == "partager boss" then
+		local module = CoAAnalyticsAddon.Modules.KeystoneBosses
+		if module then
+			module.Refresh()
+			module.ShareCurrent()
+		end
 	elseif (message == "pve log" or message == "pve log status") and CoAAnalyticsPvE then
 		CoAAnalyticsPvE.PrintDungeonDiagnosticStatus()
 	elseif (message == "pve log on" or message == "pve log start") and CoAAnalyticsPvE then
@@ -1549,7 +1569,7 @@ SlashCmdList.COAANALYTICS = function(message)
 				.. (state.pendingInspect and ", inspecting 1" or "")
 		)
 	else
-		Chat("/coaa settings | classement | joueurs | pve | performance | pve log on|off|status|clear | pve status | language fr|en | log | status | debug | retry")
+		Chat("/coaa settings | classement | joueurs | pve | performance | boss | boss share | pve log on|off|status|clear | pve status | language fr|en | log | status | debug | retry")
 	end
 end
 

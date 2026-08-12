@@ -5,8 +5,9 @@ local GameTooltip = API.CreateLocalizedTooltipProxy(GameTooltip)
 local Overlay = {}
 CoAAnalyticsAddon.Modules.DungeonOverlay = Overlay
 
-local WIDTH = 220
+local WIDTH = 248
 local HEADER_HEIGHT = 27
+local BOSS_PANEL_HEIGHT = 48
 local ROW_HEIGHT = 21
 local MAX_ROWS = 10
 
@@ -15,6 +16,11 @@ local frame
 local titleText
 local averageText
 local shareButton
+local bossPanel
+local bossNameButton
+local bossNameText
+local bossShareButton
+local bossLocateButton
 local shareSenderFrame
 local shareQueue
 local shareChannel
@@ -122,6 +128,25 @@ local function ShareCurrentRanking()
 	end
 end
 
+local function GetKeystoneBossModule()
+	return CoAAnalyticsAddon.Modules
+		and CoAAnalyticsAddon.Modules.KeystoneBosses
+end
+
+local function ShareKeystoneBoss()
+	local module = GetKeystoneBossModule()
+	if module and module.ShareCurrent then
+		module.ShareCurrent()
+	end
+end
+
+local function LocateKeystoneBoss()
+	local module = GetKeystoneBossModule()
+	if module and module.LocateCurrent then
+		module.LocateCurrent()
+	end
+end
+
 local function IsInsideDungeon()
 	local inInstance, instanceType = IsInInstance()
 	return inInstance and instanceType == "party"
@@ -163,8 +188,6 @@ end
 local function CreateRow(index)
 	local row = CreateFrame("Frame", nil, frame)
 	row:SetHeight(ROW_HEIGHT)
-	row:SetPoint("TOPLEFT", frame, "TOPLEFT", 5, -HEADER_HEIGHT - (index - 1) * ROW_HEIGHT)
-	row:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -5, -HEADER_HEIGHT - (index - 1) * ROW_HEIGHT)
 
 	row.background = row:CreateTexture(nil, "BACKGROUND")
 	row.background:SetAllPoints(row)
@@ -177,7 +200,7 @@ local function CreateRow(index)
 
 	row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	row.nameText:SetPoint("LEFT", row, "LEFT", 28, 0)
-	row.nameText:SetWidth(133)
+	row.nameText:SetWidth(161)
 	row.nameText:SetJustifyH("LEFT")
 	row.nameText:SetWordWrap(false)
 
@@ -273,6 +296,103 @@ local function CreateOverlay()
 		GameTooltip:Hide()
 	end)
 
+	bossPanel = CreateFrame("Frame", nil, frame)
+	bossPanel:SetHeight(BOSS_PANEL_HEIGHT)
+	bossPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 5, -HEADER_HEIGHT)
+	bossPanel:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -5, -HEADER_HEIGHT)
+	bossPanel:SetBackdrop({
+		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true,
+		tileSize = 16,
+		edgeSize = 8,
+		insets = { left = 2, right = 2, top = 2, bottom = 2 },
+	})
+	bossPanel:SetBackdropColor(0.10, 0.075, 0.015, 0.94)
+	bossPanel:SetBackdropBorderColor(0.95, 0.67, 0.12, 0.92)
+
+	local bossLabel = bossPanel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	bossLabel:SetPoint("TOPLEFT", bossPanel, "TOPLEFT", 8, -6)
+	bossLabel:SetText("Keystone Boss")
+	bossLabel:SetTextColor(1, 0.74, 0.16)
+
+	bossNameButton = CreateFrame("Button", nil, bossPanel)
+	bossNameButton:SetPoint("TOPLEFT", bossPanel, "TOPLEFT", 6, -17)
+	bossNameButton:SetPoint("BOTTOMRIGHT", bossPanel, "BOTTOMRIGHT", -51, 4)
+	bossNameButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+	bossNameButton:SetScript("OnClick", LocateKeystoneBoss)
+	bossNameButton:SetScript("OnEnter", function(self)
+		local info = bossPanel and bossPanel.info
+		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+		GameTooltip:AddLine(
+			info and tostring(info.boss) or "Keystone Boss",
+			1, 0.74, 0.16
+		)
+		if info and info.hint then
+			GameTooltip:AddLine(tostring(info.hint), 0.82, 0.85, 0.90, true)
+		end
+		GameTooltip:AddLine(
+			"Cible le boss et le marque d'un crane s'il est charge a proximite. Sinon, affiche l'itineraire disponible.",
+			0.60, 0.66, 0.74,
+			true
+		)
+		GameTooltip:Show()
+	end)
+	bossNameButton:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+
+	bossNameText = bossNameButton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	bossNameText:SetAllPoints(bossNameButton)
+	bossNameText:SetJustifyH("LEFT")
+	bossNameText:SetJustifyV("MIDDLE")
+	bossNameText:SetWordWrap(true)
+
+	bossLocateButton = CreateFrame("Button", nil, bossPanel)
+	bossLocateButton:SetWidth(20)
+	bossLocateButton:SetHeight(20)
+	bossLocateButton:SetPoint("BOTTOMRIGHT", bossPanel, "BOTTOMRIGHT", -27, 6)
+	bossLocateButton:SetNormalTexture("Interface\\Icons\\Ability_Hunter_SniperShot")
+	bossLocateButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+	bossLocateButton:SetScript("OnClick", LocateKeystoneBoss)
+	bossLocateButton:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:AddLine("Localiser le boss", 1, 0.74, 0.16)
+		GameTooltip:AddLine(
+			"Cible le boss et le marque d'un crane s'il est charge a proximite. Sinon, affiche l'itineraire disponible.",
+			0.78, 0.82, 0.90,
+			true
+		)
+		GameTooltip:Show()
+	end)
+	bossLocateButton:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+
+	bossShareButton = CreateFrame("Button", nil, bossPanel)
+	bossShareButton:SetWidth(20)
+	bossShareButton:SetHeight(20)
+	bossShareButton:SetPoint("BOTTOMRIGHT", bossPanel, "BOTTOMRIGHT", -5, 6)
+	bossShareButton:SetNormalTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
+	bossShareButton:SetPushedTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Down")
+	bossShareButton:SetDisabledTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Disabled")
+	bossShareButton:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+	bossShareButton:SetScript("OnClick", ShareKeystoneBoss)
+	bossShareButton:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:AddLine("Partager le boss de Keystone", 1, 0.74, 0.16)
+		GameTooltip:AddLine(
+			"Envoie le nom du boss et son itineraire au groupe.",
+			0.78, 0.82, 0.90,
+			true
+		)
+		GameTooltip:Show()
+	end)
+	bossShareButton:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	bossPanel:Hide()
+
 	for index = 1, MAX_ROWS do
 		rows[index] = CreateRow(index)
 	end
@@ -282,12 +402,38 @@ local function CreateOverlay()
 	return frame
 end
 
-local function UpdateRows(snapshot)
+local function UpdateBossPanel(info)
+	if not info then
+		bossPanel.info = nil
+		bossPanel:Hide()
+		return 0
+	end
+	bossPanel.info = info
+	bossNameText:SetText(tostring(info.boss or "Boss inconnu"))
+	if info.unknown then
+		bossNameText:SetTextColor(1, 0.35, 0.28)
+		bossLocateButton:Disable()
+		bossShareButton:Disable()
+	else
+		bossNameText:SetTextColor(1, 0.92, 0.58)
+		bossLocateButton:Enable()
+		bossShareButton:Enable()
+	end
+	bossPanel:Show()
+	return BOSS_PANEL_HEIGHT
+end
+
+local function UpdateRows(snapshot, bossPanelHeight)
 	local snapshotRows = snapshot and snapshot.rows or {}
 	local visibleCount = math.min(#snapshotRows, MAX_ROWS)
 	for index = 1, MAX_ROWS do
 		local row = rows[index]
 		local data = snapshotRows[index]
+		row:ClearAllPoints()
+		local y = -HEADER_HEIGHT - (bossPanelHeight or 0)
+			- (index - 1) * ROW_HEIGHT
+		row:SetPoint("TOPLEFT", frame, "TOPLEFT", 5, y)
+		row:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -5, y)
 		if data then
 			local color = RAID_CLASS_COLORS[data.classToken]
 				or { r = 0.85, g = 0.85, b = 0.85 }
@@ -327,7 +473,9 @@ local function UpdateRows(snapshot)
 		row:Show()
 		visibleCount = 1
 	end
-	frame:SetHeight(HEADER_HEIGHT + visibleCount * ROW_HEIGHT + 5)
+	frame:SetHeight(
+		HEADER_HEIGHT + (bossPanelHeight or 0) + visibleCount * ROW_HEIGHT + 5
+	)
 end
 
 function Overlay.Refresh(snapshot)
@@ -343,8 +491,13 @@ function Overlay.Refresh(snapshot)
 	if not snapshot and PvE and PvE.GetCurrentDungeonSnapshot then
 		snapshot = PvE.GetCurrentDungeonSnapshot()
 	end
-	UpdateRows(snapshot)
+	local bossModule = GetKeystoneBossModule()
+	local bossInfo = bossModule and bossModule.GetCurrent
+		and bossModule.GetCurrent()
+	local bossHeight = UpdateBossPanel(bossInfo)
+	UpdateRows(snapshot, bossHeight)
 	local instanceName = snapshot and snapshot.instanceName
+		or bossInfo and bossInfo.dungeon
 	titleText:SetText(instanceName and tostring(instanceName) or "Performance du donjon")
 	if snapshot and snapshot.averageRating then
 		averageText:SetText(PvE.FormatRating(snapshot.averageRating) .. "/10")
@@ -400,6 +553,15 @@ CoAAnalyticsAddon.Events:Register(
 	function(snapshot)
 		if addonDB and addonDB.showDungeonPerformanceOverlay then
 			Overlay.Refresh(snapshot)
+		end
+	end
+)
+
+CoAAnalyticsAddon.Events:Register(
+	"KEYSTONE_BOSS_UPDATED",
+	function()
+		if addonDB and addonDB.showDungeonPerformanceOverlay then
+			Overlay.Refresh()
 		end
 	end
 )

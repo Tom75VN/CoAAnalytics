@@ -40,6 +40,9 @@ local ENGLISH = {
 	["Performance du donjon"] = "Dungeon Performance",
 	["Performance du donjon a l'ecran"] = "On-screen Dungeon Performance",
 	["Afficher le widget de performance en donjon"] = "Show the dungeon performance widget",
+	["Afficher le boss de Keystone en Mythic 0"] = "Show the Keystone boss in Mythic 0",
+	["Active la detection automatique, l'annonce, la localisation et le partage du boss de Keystone."] =
+		"Enables automatic Keystone boss detection, announcement, location help, and sharing.",
 	["Reinitialiser la position"] = "Reset Position",
 	["Historique des diagnostics de donjon"] = "Dungeon Diagnostic History",
 	["Aucun diagnostic enregistre"] = "No diagnostic recorded",
@@ -80,6 +83,18 @@ local ENGLISH = {
 	["EN ATTENTE D'UN DONJON"] = "WAITING FOR A DUNGEON",
 	["Aucun"] = "None",
 	["Partager le classement"] = "Share Ranking",
+	["Keystone Boss"] = "Keystone Boss",
+	["Partager le boss de Keystone"] = "Share Keystone Boss",
+	["Localiser le boss"] = "Locate Boss",
+	["Cible le boss et le marque d'un crane s'il est charge a proximite. Sinon, affiche l'itineraire disponible."] =
+		"Targets the boss and marks it with a skull when loaded nearby. Otherwise, shows the available route.",
+	["Envoie le nom du boss et son itineraire au groupe."] =
+		"Sends the boss name and its route to the group.",
+	["aucun boss de Keystone a partager"] = "no Keystone boss to share",
+	["aucun boss de Keystone dans ce donjon"] = "no Keystone boss in this dungeon",
+	["est cible et marque s'il est a portee"] = "is targeted and marked when in range",
+	["Le client ne fournit pas de coordonnees fiables dans ce donjon; le bouton ciblera le boss des qu'il sera charge a proximite."] =
+		"The client does not provide reliable coordinates in this dungeon; the button will target the boss once it is loaded nearby.",
 	["CoA Analytics - Groupe "] = "CoA Analytics - Group ",
 	["Glisser pour deplacer"] = "Drag to move",
 	["Collecte en cours..."] = "Collecting data...",

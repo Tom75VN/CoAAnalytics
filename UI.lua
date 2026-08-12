@@ -130,6 +130,11 @@ local function RefreshSettingsControls()
 			addonDB.showDungeonPerformanceOverlay and 1 or nil
 		)
 	end
+	if ui.enableKeystoneBossCheckButton then
+		ui.enableKeystoneBossCheckButton:SetChecked(
+			addonDB.enableKeystoneBossFeature and 1 or nil
+		)
+	end
 	if ui.diagnosticStatusText and CoAAnalyticsPvE
 		and CoAAnalyticsPvE.GetDungeonDiagnosticStatus
 	then
@@ -1645,7 +1650,7 @@ local function CreateSettingsFrame()
 	local overlayCard = CreateFrame("Frame", nil, ui.generalSettingsPanel)
 	overlayCard:SetPoint("TOPLEFT", ui.generalSettingsPanel, "TOPLEFT", 8, -8)
 	overlayCard:SetPoint("TOPRIGHT", ui.generalSettingsPanel, "TOPRIGHT", -8, -8)
-	overlayCard:SetHeight(130)
+	overlayCard:SetHeight(160)
 	overlayCard:SetBackdrop({
 		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
 		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -1691,6 +1696,57 @@ local function CreateSettingsFrame()
 		end
 	end)
 
+	ui.enableKeystoneBossCheckButton = CreateFrame(
+		"CheckButton",
+		"CoAAnalyticsEnableKeystoneBossCheckButton",
+		overlayCard,
+		"UICheckButtonTemplate"
+	)
+	ui.enableKeystoneBossCheckButton:SetWidth(24)
+	ui.enableKeystoneBossCheckButton:SetHeight(24)
+	ui.enableKeystoneBossCheckButton:SetPoint(
+		"TOPLEFT",
+		overlayCard,
+		"TOPLEFT",
+		21,
+		-116
+	)
+	local keystoneBossCheckLabel = overlayCard:CreateFontString(
+		nil,
+		"OVERLAY",
+		"GameFontHighlight"
+	)
+	keystoneBossCheckLabel:SetPoint(
+		"LEFT",
+		ui.enableKeystoneBossCheckButton,
+		"RIGHT",
+		4,
+		0
+	)
+	keystoneBossCheckLabel:SetText("Afficher le boss de Keystone en Mythic 0")
+	ui.enableKeystoneBossCheckButton:SetScript("OnClick", function(self)
+		addonDB.enableKeystoneBossFeature = self:GetChecked() and true or false
+		local module = CoAAnalyticsAddon.Modules.KeystoneBosses
+		if module and module.ApplySettings then
+			module.ApplySettings()
+		end
+	end)
+	ui.enableKeystoneBossCheckButton:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:AddLine("Afficher le boss de Keystone en Mythic 0", 0.10, 0.72, 0.52)
+		GameTooltip:AddLine(
+			"Active la detection automatique, l'annonce, la localisation et le partage du boss de Keystone.",
+			0.78,
+			0.82,
+			0.90,
+			true
+		)
+		GameTooltip:Show()
+	end)
+	ui.enableKeystoneBossCheckButton:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+
 	local resetOverlayButton = CreateFrame(
 		"Button",
 		nil,
@@ -1699,7 +1755,7 @@ local function CreateSettingsFrame()
 	)
 	resetOverlayButton:SetWidth(150)
 	resetOverlayButton:SetHeight(24)
-	resetOverlayButton:SetPoint("BOTTOMRIGHT", overlayCard, "BOTTOMRIGHT", -22, 12)
+	resetOverlayButton:SetPoint("TOPRIGHT", overlayCard, "TOPRIGHT", -22, -16)
 	resetOverlayButton:SetText("Reinitialiser la position")
 	resetOverlayButton:SetScript("OnClick", function()
 		local overlay = CoAAnalyticsAddon.Modules.DungeonOverlay
