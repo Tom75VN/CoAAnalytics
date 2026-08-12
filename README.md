@@ -9,7 +9,7 @@ A performance analysis addon for World of Warcraft: Ascension.
 - Live dungeon performance ratings
 - Mythic 0 Keystone boss identification, required boss-order drawer, and English party sharing
 - Pet, guardian, healing, threat, and utility tracking
-- Per-death spell and pull-aggro diagnostics
+- Per-death spell, aura, exact-threat, and aggro diagnostics for every role
 - English and French interface
 
 In a recognized Mythic 0 dungeon, the live performance widget shows the

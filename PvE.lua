@@ -38,6 +38,7 @@ local PULL_AGGRO_WINDOW = 10
 local EARLY_HEAL_THREAT_WINDOW = 3
 local MAX_DEATH_EVENTS = 20
 local MAX_DEATH_DAMAGE_EVENTS = 8
+local THREAT_SAMPLE_MAX_AGE = 1.5
 local SUSTAINED_HEALING_PERIODIC_SHARE = 0.35
 local DIRECT_HEALER_CLEAN_RECOVERY_FLOOR = 0.95
 local SUSTAINED_HEALER_CLEAN_RECOVERY_FLOOR = 1.00
@@ -463,6 +464,16 @@ local function NewStats(member)
 		urgentRecoveryFailures = 0,
 		minHealthPct = 1,
 		utilityActions = 0,
+		threatUnitSeconds = 0,
+		threatStatus0Seconds = 0,
+		threatStatus1Seconds = 0,
+		threatStatus2Seconds = 0,
+		threatStatus3Seconds = 0,
+		scaledThreatPctSeconds = 0,
+		rawThreatPctSeconds = 0,
+		peakScaledThreatPct = 0,
+		peakRawThreatPct = 0,
+		enemyTargetSeconds = 0,
 		combatObservedSeconds = 0,
 		aliveCombatSeconds = 0,
 		healerScorableCombatSeconds = 0,
@@ -613,8 +624,11 @@ local function PurgeDepartedRosterMember(guid)
 	if session.recentIncoming then
 		session.recentIncoming[guid] = nil
 	end
-	if session.recentHealerActions then
-		session.recentHealerActions[guid] = nil
+	if session.recentThreatActions then
+		session.recentThreatActions[guid] = nil
+	end
+	if session.activeAuras then
+		session.activeAuras[guid] = nil
 	end
 	session.roster[guid] = nil
 	return true
@@ -2383,7 +2397,8 @@ local function EnterInstance(context)
 		petOwners = {},
 		mobs = {},
 		recentIncoming = {},
-		recentHealerActions = {},
+		recentThreatActions = {},
+		activeAuras = {},
 		diagnosticEnabled = context.scope == "dungeon" and diagnosticArmed,
 		diagnosticPendingStart = context.scope == "dungeon" and diagnosticArmed,
 	}
@@ -2609,6 +2624,38 @@ local function PushRecentEvent(collection, guid, event, window, maximum)
 	end
 end
 
+local function CopyThreatSample(sample, now)
+	if type(sample) ~= "table" then
+		return
+	end
+	return {
+		observedSecondsAgo = math.max(0, now - SafeNumber(sample.at)),
+		fresh = now - SafeNumber(sample.at) <= THREAT_SAMPLE_MAX_AGE,
+		isTanking = sample.isTanking and true or false,
+		status = SafeNumber(sample.status),
+		scaledPercent = sample.scaledPercent,
+		rawPercent = sample.rawPercent,
+		threatValue = sample.threatValue,
+	}
+end
+
+local function GetIncomingThreatSnapshot(mob, victimGUID, now)
+	local tanks = {}
+	local victim = mob and mob.threatByGUID
+		and CopyThreatSample(mob.threatByGUID[victimGUID], now) or nil
+	for guid, member in pairs(session.roster or {}) do
+		if GetRole(member) == "TANK" then
+			tanks[#tanks + 1] = {
+				guid = guid,
+				name = member.name,
+				threat = mob and mob.threatByGUID
+					and CopyThreatSample(mob.threatByGUID[guid], now) or nil,
+			}
+		end
+	end
+	return victim, tanks
+end
+
 local function RecordIncomingDamageContext(
 	destOwner, sourceGUID, sourceName, amount, absorbed, spellID, spellName
 )
@@ -2619,6 +2666,9 @@ local function RecordIncomingDamageContext(
 		and session.recentIncoming or {}
 	local now = GetTime()
 	local mob = session.mobs[sourceGUID]
+	local victimThreat, tankThreats = GetIncomingThreatSnapshot(
+		mob, destOwner, now
+	)
 	PushRecentEvent(session.recentIncoming, destOwner, {
 		at = now,
 		sourceGUID = sourceGUID,
@@ -2634,20 +2684,23 @@ local function RecordIncomingDamageContext(
 		tankGUID = mob and mob.tankControlledNow and mob.ownerGUID or nil,
 		firstTankDelay = mob and mob.firstTankAt and mob.engagedAt
 			and math.max(0, mob.firstTankAt - mob.engagedAt) or nil,
+		enemyClassification = mob and mob.classification or nil,
+		enemyTargetGUID = mob and mob.currentTargetGUID or nil,
+		enemyTargetName = mob and mob.currentTargetName or nil,
+		victimThreat = victimThreat,
+		tankThreats = tankThreats,
 	}, DEATH_CONTEXT_WINDOW + 4, 30)
 end
 
-local function RecordHealerThreatAction(
+local function RecordThreatAction(
 	sourceOwner, targetOwner, amount, spellID, spellName, actionType, isPeriodic
 )
-	if not session or not sourceOwner
-		or GetRole(session.roster[sourceOwner]) ~= "HEALER"
-	then
+	if not session or not sourceOwner then
 		return
 	end
-	session.recentHealerActions = type(session.recentHealerActions) == "table"
-		and session.recentHealerActions or {}
-	PushRecentEvent(session.recentHealerActions, sourceOwner, {
+	session.recentThreatActions = type(session.recentThreatActions) == "table"
+		and session.recentThreatActions or {}
+	PushRecentEvent(session.recentThreatActions, sourceOwner, {
 		at = GetTime(),
 		targetGUID = targetOwner,
 		amount = amount,
@@ -2660,7 +2713,7 @@ end
 
 local function RecordDamage(
 	sourceGUID, sourceName, sourceFlags, destGUID, amount, absorbed,
-	spellID, spellName
+	spellID, spellName, isPeriodic
 )
 	if not session or amount <= 0 then
 		return
@@ -2669,6 +2722,10 @@ local function RecordDamage(
 	local destOwner = GetOwnerGUID(destGUID)
 	if sourceOwner and not destOwner then
 		MarkMobEngaged(destGUID)
+		RecordThreatAction(
+			sourceOwner, destGUID, amount, spellID, spellName,
+			"damage", isPeriodic
+		)
 	elseif destOwner and not sourceOwner then
 		MarkMobEngaged(sourceGUID)
 		RecordIncomingDamageContext(
@@ -2767,7 +2824,7 @@ local function RecordHealing(
 	end
 	local effective = math.max(0, amount - math.max(0, overhealing or 0))
 	if effective > 0 then
-		RecordHealerThreatAction(
+		RecordThreatAction(
 			sourceOwner, destOwner, effective, spellID, spellName,
 			"healing", isPeriodic
 		)
@@ -2816,7 +2873,7 @@ local function RecordAbsorb(destGUID, absorberGUID, amount)
 	if not absorberOwner or not destOwner or amount <= 0 then
 		return
 	end
-	RecordHealerThreatAction(
+	RecordThreatAction(
 		absorberOwner, destOwner, amount, nil, "Absorb", "absorb", false
 	)
 	ForSamples(function(sample)
@@ -2840,7 +2897,7 @@ local function RecordAbsorb(destGUID, absorberGUID, amount)
 	end)
 end
 
-local function RecordUtility(sourceGUID)
+local function RecordUtility(sourceGUID, destGUID, spellID, spellName)
 	if not session then
 		return
 	end
@@ -2854,12 +2911,49 @@ local function RecordUtility(sourceGUID)
 	if not owner then
 		return
 	end
+	RecordThreatAction(
+		owner, destGUID, 0, spellID, spellName, "utility", false
+	)
 	ForSamples(function(sample)
 		local stats = GetSampleStats(sample, owner)
 		if stats then
 			stats.utilityActions = SafeNumber(stats.utilityActions) + 1
 		end
 	end)
+end
+
+local function RecordAuraContext(
+	subevent, sourceGUID, sourceName, destGUID,
+	spellID, spellName, auraType
+)
+	if not session then
+		return
+	end
+	local destOwner = GetOwnerGUID(destGUID)
+	if not destOwner or not spellID then
+		return
+	end
+	session.activeAuras = type(session.activeAuras) == "table"
+		and session.activeAuras or {}
+	local active = type(session.activeAuras[destOwner]) == "table"
+		and session.activeAuras[destOwner] or {}
+	session.activeAuras[destOwner] = active
+	if subevent == "SPELL_AURA_REMOVED"
+		or subevent == "SPELL_AURA_REMOVED_DOSE"
+	then
+		active[spellID] = nil
+	else
+		local previous = active[spellID]
+		active[spellID] = {
+			appliedAt = previous and previous.appliedAt or GetTime(),
+			refreshedAt = GetTime(),
+			sourceGUID = sourceGUID,
+			sourceName = sourceName,
+			spellID = spellID,
+			spellName = spellName,
+			auraType = auraType,
+		}
+	end
 end
 
 local function GetDeathContext(now)
@@ -2905,7 +2999,9 @@ local function GetDeathContext(now)
 	}
 end
 
-local function BuildDeathAggroDiagnostic(guid, stats, now, deathCategory)
+local function BuildDeathAggroDiagnostic(
+	guid, stats, now, deathCategory, deathContext
+)
 	local incoming = (session.recentIncoming or {})[guid] or {}
 	local relevant = {}
 	local earliest
@@ -2913,10 +3009,15 @@ local function BuildDeathAggroDiagnostic(guid, stats, now, deathCategory)
 	local pullHits = 0
 	local controlledHits = 0
 	local lostAfterControl = 0
+	local targetMatches = 0
+	local victimTankingHits = 0
+	local tankSecureHits = 0
+	local attackerGUIDs = {}
 	for index = #incoming, 1, -1 do
 		local hit = incoming[index]
 		local age = now - SafeNumber(hit.at)
 		if age <= DEATH_CONTEXT_WINDOW then
+			attackerGUIDs[hit.sourceGUID] = true
 			local mob = session.mobs[hit.sourceGUID]
 			local firstTankAfterHit = mob and mob.firstTankAt
 				and mob.firstTankAt > SafeNumber(hit.at)
@@ -2946,42 +3047,73 @@ local function BuildDeathAggroDiagnostic(guid, stats, now, deathCategory)
 			then
 				pullHits = pullHits + 1
 			end
+			if hit.enemyTargetGUID == guid then
+				targetMatches = targetMatches + 1
+			end
+			if hit.victimThreat and (
+				hit.victimThreat.isTanking
+				or SafeNumber(hit.victimThreat.status) >= 2
+			) then
+				victimTankingHits = victimTankingHits + 1
+			end
+			for _, tank in ipairs(hit.tankThreats or {}) do
+				local threat = tank.threat
+				if threat and threat.fresh and (
+					threat.isTanking or SafeNumber(threat.status) == 3
+				) then
+					tankSecureHits = tankSecureHits + 1
+					break
+				end
+			end
 		end
 	end
-	local recentHeal
-	for _, action in ipairs((session.recentHealerActions or {})[guid] or {}) do
+	local recentAction
+	for _, action in ipairs((session.recentThreatActions or {})[guid] or {}) do
+		local relevantAction = action.actionType ~= "damage"
+			or attackerGUIDs[action.targetGUID]
 		if earliest and action.at <= earliest
 			and earliest - action.at <= EARLY_HEAL_THREAT_WINDOW
+			and relevantAction
 		then
-			recentHeal = action
+			recentAction = action
 		end
 	end
 
 	local aggroCause = "not_aggro_related"
 	local responsibility = "unknown"
 	local confidence = "low"
-	if GetRole(session.roster[guid]) == "HEALER" and #relevant > 0 then
+	local victimRole = GetRole(session.roster[guid])
+	if victimRole ~= "TANK" and #relevant > 0 then
 		if pullHits > 0 and uncontrolled > 0 then
-			if recentHeal then
-				aggroCause = "early_healing_before_tank_control"
-				responsibility = "shared_or_healer_timing"
-				confidence = "medium"
+			if recentAction then
+				aggroCause = recentAction.actionType == "damage"
+					and "early_damage_before_tank_control"
+					or "early_support_before_tank_control"
+				responsibility = recentAction.periodic
+					and "shared_periodic_threat"
+					or "player_timing_likely"
+				confidence = victimTankingHits > 0 and "high" or "medium"
 			else
 				aggroCause = "tank_pull_aggro_not_established"
 				responsibility = "tank_likely"
-				confidence = "medium"
+				confidence = targetMatches > 0 and "high" or "medium"
 			end
+		elseif victimTankingHits > 0 and recentAction then
+			aggroCause = "player_overtook_tank_threat"
+			responsibility = recentAction.periodic
+				and "shared_periodic_threat" or "player_threat_likely"
+			confidence = tankSecureHits > 0 and "high" or "medium"
 		elseif lostAfterControl > 0 then
 			aggroCause = "tank_aggro_lost_after_control"
 			responsibility = "tank_likely"
-			confidence = "medium"
+			confidence = targetMatches > 0 and "high" or "medium"
 		elseif controlledHits > 0 and uncontrolled == 0 then
 			aggroCause = "targeted_mechanic_or_secondary_damage"
 			responsibility = "unknown"
 			confidence = "low"
 		elseif uncontrolled > 0 then
 			aggroCause = "hostile_aggro_without_observed_tank_control"
-			responsibility = recentHeal and "shared_or_healer_timing" or "tank_likely"
+			responsibility = recentAction and "shared_threat_race" or "tank_likely"
 			confidence = "low"
 		end
 	end
@@ -3003,6 +3135,11 @@ local function BuildDeathAggroDiagnostic(guid, stats, now, deathCategory)
 			firstTankDelay = hit.firstTankDelay,
 			threatObserved = hit.threatObservedAtDeath
 				or hit.threatObserved or false,
+			enemyClassification = hit.enemyClassification,
+			enemyTargetGUID = hit.enemyTargetGUID,
+			enemyTargetName = hit.enemyTargetName,
+			victimThreat = hit.victimThreat,
+			tankThreats = hit.tankThreats,
 		}
 	end
 	local tanks = {}
@@ -3014,6 +3151,17 @@ local function BuildDeathAggroDiagnostic(guid, stats, now, deathCategory)
 			}
 		end
 	end
+	local activeAuras = {}
+	for _, aura in pairs((session.activeAuras or {})[guid] or {}) do
+		activeAuras[#activeAuras + 1] = {
+			activeSeconds = math.max(0, now - SafeNumber(aura.appliedAt)),
+			sourceGUID = aura.sourceGUID,
+			sourceName = aura.sourceName,
+			spellID = aura.spellID,
+			spellName = aura.spellName,
+			auraType = aura.auraType,
+		}
+	end
 
 	return {
 		at = time(),
@@ -3024,17 +3172,35 @@ local function BuildDeathAggroDiagnostic(guid, stats, now, deathCategory)
 		aggroCause = aggroCause,
 		responsibility = responsibility,
 		confidence = confidence,
-		role = GetRole(session.roster[guid]),
+		role = victimRole,
 		lastObservedHealthPct = stats.lastHealthPct,
 		lastObservedManaPct = stats.lastManaPct,
-		earlyHealingAction = recentHeal and {
-			secondsBeforeFirstHit = earliest - recentHeal.at,
-			spellID = recentHeal.spellID,
-			spellName = recentHeal.spellName,
-			actionType = recentHeal.actionType,
-			amount = recentHeal.amount,
-			periodic = recentHeal.periodic,
+		groupDeathContext = {
+			inCombat = deathContext and deathContext.inCombat or false,
+			recovery = deathContext and deathContext.recovery or false,
+			clustered = deathContext and deathContext.clustered or false,
+			majorityDead = deathContext and deathContext.majorityDead or false,
+			currentMembers = deathContext and deathContext.current or 0,
+			deadMembers = deathContext and deathContext.dead or 0,
+		},
+		recentThreatAction = recentAction and {
+			secondsBeforeFirstHit = earliest - recentAction.at,
+			targetGUID = recentAction.targetGUID,
+			spellID = recentAction.spellID,
+			spellName = recentAction.spellName,
+			actionType = recentAction.actionType,
+			amount = recentAction.amount,
+			periodic = recentAction.periodic,
 		} or nil,
+		threatSummary = {
+			targetMatches = targetMatches,
+			victimTankingHits = victimTankingHits,
+			tankSecureHits = tankSecureHits,
+			controlledHits = controlledHits,
+			uncontrolledHits = uncontrolled,
+			pullWindowHits = pullHits,
+		},
+		activeAuras = activeAuras,
 		tanks = tanks,
 		incomingHits = hits,
 	}
@@ -3107,7 +3273,8 @@ local function RecordDeath(destGUID)
 				AppendDeathDiagnostic(
 					stats,
 					BuildDeathAggroDiagnostic(
-						owner, stats, now, deathCategory or "unclassified"
+						owner, stats, now,
+						deathCategory or "unclassified", deathContext
 					)
 				)
 				if preventable and stats.coveredCriticalStartedAt then
@@ -3172,7 +3339,7 @@ local function ParseCombatLog(...)
 		local absorbed = SafeNumber(select(extraIndex + 5, ...))
 		RecordDamage(
 			sourceGUID, sourceName, sourceFlags, destGUID, amount, absorbed,
-			nil, "Melee"
+			nil, "Melee", false
 		)
 	elseif subevent == "SPELL_DAMAGE"
 		or subevent == "SPELL_PERIODIC_DAMAGE"
@@ -3183,13 +3350,14 @@ local function ParseCombatLog(...)
 		local absorbed = SafeNumber(select(extraIndex + 8, ...))
 		RecordDamage(
 			sourceGUID, sourceName, sourceFlags, destGUID, amount, absorbed,
-			select(extraIndex, ...), select(extraIndex + 1, ...)
+			select(extraIndex, ...), select(extraIndex + 1, ...),
+			subevent == "SPELL_PERIODIC_DAMAGE"
 		)
 	elseif subevent == "ENVIRONMENTAL_DAMAGE" then
 		RecordDamage(
 			sourceGUID, sourceName, sourceFlags, destGUID,
 			SafeNumber(select(extraIndex + 1, ...)), 0, nil,
-			tostring(select(extraIndex, ...) or "Environmental")
+			tostring(select(extraIndex, ...) or "Environmental"), false
 		)
 	elseif subevent == "SPELL_HEAL" or subevent == "SPELL_PERIODIC_HEAL" then
 		local amount = SafeNumber(select(extraIndex + 3, ...))
@@ -3220,7 +3388,21 @@ local function ParseCombatLog(...)
 		or subevent == "SPELL_STOLEN"
 		or subevent == "SPELL_INTERRUPT"
 	then
-		RecordUtility(sourceGUID)
+		RecordUtility(
+			sourceGUID, destGUID,
+			select(extraIndex, ...), select(extraIndex + 1, ...)
+		)
+	elseif subevent == "SPELL_AURA_APPLIED"
+		or subevent == "SPELL_AURA_APPLIED_DOSE"
+		or subevent == "SPELL_AURA_REFRESH"
+		or subevent == "SPELL_AURA_REMOVED"
+		or subevent == "SPELL_AURA_REMOVED_DOSE"
+	then
+		RecordAuraContext(
+			subevent, sourceGUID, sourceName, destGUID,
+			select(extraIndex, ...), select(extraIndex + 1, ...),
+			select(extraIndex + 3, ...)
+		)
 	elseif subevent == "UNIT_DIED" or subevent == "UNIT_DESTROYED" then
 		RecordDeath(destGUID)
 	elseif subevent == "SPELL_SUMMON" or subevent == "SPELL_CREATE" then
@@ -3534,6 +3716,62 @@ local function SampleThreat(elapsed)
 		end
 		mob.lastSeen = now
 		mob.threatObserved = true
+		mob.currentTargetGUID = UnitGUID(mobToken.unit .. "target")
+		mob.currentTargetName = UnitName(mobToken.unit .. "target")
+		mob.threatByGUID = type(mob.threatByGUID) == "table"
+			and mob.threatByGUID or {}
+		for guid, member in pairs(session.roster or {}) do
+			if member.unit and UnitExists(member.unit) then
+				local success, isTanking, status, scaledPercent,
+					rawPercent, threatValue = pcall(
+						UnitDetailedThreatSituation,
+						member.unit,
+						mobToken.unit
+					)
+				if success then
+					local threatSample = {
+						at = now,
+						isTanking = isTanking and true or false,
+						status = status,
+						scaledPercent = scaledPercent,
+						rawPercent = rawPercent,
+						threatValue = threatValue,
+					}
+					mob.threatByGUID[guid] = threatSample
+					ForSamples(function(sample)
+						local stats = GetSampleStats(sample, guid)
+						if stats then
+							local threatStatus = math.floor(Clamp(
+								SafeNumber(status), 0, 3
+							))
+							stats.threatUnitSeconds =
+								SafeNumber(stats.threatUnitSeconds) + elapsed
+							local statusKey = "threatStatus"
+								.. tostring(threatStatus) .. "Seconds"
+							stats[statusKey] = SafeNumber(stats[statusKey]) + elapsed
+							stats.scaledThreatPctSeconds =
+								SafeNumber(stats.scaledThreatPctSeconds)
+									+ SafeNumber(scaledPercent) * elapsed
+							stats.rawThreatPctSeconds =
+								SafeNumber(stats.rawThreatPctSeconds)
+									+ SafeNumber(rawPercent) * elapsed
+							stats.peakScaledThreatPct = math.max(
+								SafeNumber(stats.peakScaledThreatPct),
+								SafeNumber(scaledPercent)
+							)
+							stats.peakRawThreatPct = math.max(
+								SafeNumber(stats.peakRawThreatPct),
+								SafeNumber(rawPercent)
+							)
+							if mob.currentTargetGUID == guid then
+								stats.enemyTargetSeconds =
+									SafeNumber(stats.enemyTargetSeconds) + elapsed
+							end
+						end
+					end)
+				end
+			end
+		end
 		if mob.classification == "worldboss"
 			and session.context.scope == "dungeon"
 			and not session.encounter
@@ -3545,12 +3783,10 @@ local function SampleThreat(elapsed)
 		end
 		local holder
 		for _, tank in ipairs(tanks) do
-			local success, isTanking, status = pcall(
-				UnitDetailedThreatSituation,
-				tank.unit,
-				mobToken.unit
-			)
-			if success and (isTanking or status == 2 or status == 3) then
+			local threat = mob.threatByGUID[tank.guid]
+			if threat and (
+				threat.isTanking or threat.status == 2 or threat.status == 3
+			) then
 				holder = tank
 				break
 			end
@@ -3924,7 +4160,12 @@ local CURRENT_STAT_KEYS = {
 	"healthPctSeconds", "below75Seconds", "below50Seconds", "below25Seconds",
 	"criticalEpisodes", "criticalFailures", "recoveryTimeTotal", "recoveryCount",
 	"urgentRecoveryTimeTotal", "urgentRecoveryCount", "urgentRecoveryFailures",
-	"minHealthPct", "utilityActions", "combatObservedSeconds",
+	"minHealthPct", "utilityActions", "threatUnitSeconds",
+	"threatStatus0Seconds", "threatStatus1Seconds",
+	"threatStatus2Seconds", "threatStatus3Seconds",
+	"scaledThreatPctSeconds", "rawThreatPctSeconds",
+	"peakScaledThreatPct", "peakRawThreatPct", "enemyTargetSeconds",
+	"combatObservedSeconds",
 	"aliveCombatSeconds", "healerScorableCombatSeconds",
 	"healerScorableAliveSeconds", "bossObservedSeconds", "trashObservedSeconds",
 	"healerCoverageAssessableSeconds", "healerCoveredHealthObservedSeconds",
@@ -4015,6 +4256,20 @@ local function CopyCurrentStats(stats)
 end
 
 local function CopyDeathEvents(events)
+	local function CopyStoredThreat(threat)
+		if type(threat) ~= "table" then
+			return
+		end
+		return {
+			observedSecondsAgo = threat.observedSecondsAgo,
+			fresh = threat.fresh,
+			isTanking = threat.isTanking,
+			status = threat.status,
+			scaledPercent = threat.scaledPercent,
+			rawPercent = threat.rawPercent,
+			threatValue = threat.threatValue,
+		}
+	end
 	local copy = {}
 	for _, event in ipairs(type(events) == "table" and events or {}) do
 		local item = {
@@ -4028,23 +4283,37 @@ local function CopyDeathEvents(events)
 			role = event.role,
 			lastObservedHealthPct = event.lastObservedHealthPct,
 			lastObservedManaPct = event.lastObservedManaPct,
+			threatSummary = event.threatSummary,
+			groupDeathContext = event.groupDeathContext,
 			incomingHits = {},
 			tanks = {},
+			activeAuras = {},
 		}
-		if event.earlyHealingAction then
-			item.earlyHealingAction = {
-				secondsBeforeFirstHit = event.earlyHealingAction.secondsBeforeFirstHit,
-				spellID = event.earlyHealingAction.spellID,
-				spellName = event.earlyHealingAction.spellName,
-				actionType = event.earlyHealingAction.actionType,
-				amount = event.earlyHealingAction.amount,
-				periodic = event.earlyHealingAction.periodic,
+		if event.recentThreatAction then
+			item.recentThreatAction = {
+				secondsBeforeFirstHit = event.recentThreatAction.secondsBeforeFirstHit,
+				targetGUID = event.recentThreatAction.targetGUID,
+				spellID = event.recentThreatAction.spellID,
+				spellName = event.recentThreatAction.spellName,
+				actionType = event.recentThreatAction.actionType,
+				amount = event.recentThreatAction.amount,
+				periodic = event.recentThreatAction.periodic,
 			}
 		end
 		for _, tank in ipairs(event.tanks or {}) do
 			item.tanks[#item.tanks + 1] = {
 				guid = tank.guid,
 				name = tank.name,
+			}
+		end
+		for _, aura in ipairs(event.activeAuras or {}) do
+			item.activeAuras[#item.activeAuras + 1] = {
+				activeSeconds = aura.activeSeconds,
+				sourceGUID = aura.sourceGUID,
+				sourceName = aura.sourceName,
+				spellID = aura.spellID,
+				spellName = aura.spellName,
+				auraType = aura.auraType,
 			}
 		end
 		for _, hit in ipairs(event.incomingHits or {}) do
@@ -4061,7 +4330,20 @@ local function CopyDeathEvents(events)
 				tankGUID = hit.tankGUID,
 				firstTankDelay = hit.firstTankDelay,
 				threatObserved = hit.threatObserved,
+				enemyClassification = hit.enemyClassification,
+				enemyTargetGUID = hit.enemyTargetGUID,
+				enemyTargetName = hit.enemyTargetName,
+				victimThreat = CopyStoredThreat(hit.victimThreat),
+				tankThreats = {},
 			}
+			local copiedHit = item.incomingHits[#item.incomingHits]
+			for _, tankThreat in ipairs(hit.tankThreats or {}) do
+				copiedHit.tankThreats[#copiedHit.tankThreats + 1] = {
+					guid = tankThreat.guid,
+					name = tankThreat.name,
+					threat = CopyStoredThreat(tankThreat.threat),
+				}
+			end
 		end
 		copy[#copy + 1] = item
 	end
@@ -4085,6 +4367,32 @@ local function CopyUnattributedFriendlySources(sources)
 		table.remove(copy)
 	end
 	return copy
+end
+
+local function BuildDeathAttributionSummary(rows)
+	local summary = {
+		total = 0,
+		byCause = {},
+		byResponsibility = {},
+		byRole = {},
+		byConfidence = {},
+	}
+	for _, row in ipairs(rows or {}) do
+		for _, event in ipairs(row.deathEvents or {}) do
+			summary.total = summary.total + 1
+			local cause = tostring(event.aggroCause or "unknown")
+			local responsibility = tostring(event.responsibility or "unknown")
+			local role = tostring(event.role or row.role or "UNKNOWN")
+			local confidence = tostring(event.confidence or "low")
+			summary.byCause[cause] = SafeNumber(summary.byCause[cause]) + 1
+			summary.byResponsibility[responsibility] =
+				SafeNumber(summary.byResponsibility[responsibility]) + 1
+			summary.byRole[role] = SafeNumber(summary.byRole[role]) + 1
+			summary.byConfidence[confidence] =
+				SafeNumber(summary.byConfidence[confidence]) + 1
+		end
+	end
+	return summary
 end
 
 BuildCurrentDungeonSnapshot = function(finished)
@@ -4154,6 +4462,7 @@ BuildCurrentDungeonSnapshot = function(finished)
 		end
 
 		local classToken = data.specializationClassToken or data.classToken
+		local threatUnitSeconds = SafeNumber(stats.threatUnitSeconds)
 		local row = {
 			guid = participant.guid,
 			name = GetValidPlayerName(participant.member.name)
@@ -4191,6 +4500,29 @@ BuildCurrentDungeonSnapshot = function(finished)
 			damageTaken = SafeNumber(stats.damageTaken),
 			deaths = SafeNumber(stats.deaths),
 			deathEvents = CopyDeathEvents(stats.deathEvents),
+			threatSummary = {
+				observedUnitSeconds = threatUnitSeconds,
+				averageScaledPercent = threatUnitSeconds > 0
+					and SafeNumber(stats.scaledThreatPctSeconds)
+						/ threatUnitSeconds or nil,
+				averageRawPercent = threatUnitSeconds > 0
+					and SafeNumber(stats.rawThreatPctSeconds)
+						/ threatUnitSeconds or nil,
+				peakScaledPercent = SafeNumber(stats.peakScaledThreatPct),
+				peakRawPercent = SafeNumber(stats.peakRawThreatPct),
+				highThreatRate = threatUnitSeconds > 0 and (
+					SafeNumber(stats.threatStatus1Seconds)
+						+ SafeNumber(stats.threatStatus2Seconds)
+						+ SafeNumber(stats.threatStatus3Seconds)
+				) / threatUnitSeconds or nil,
+				tankingThreatRate = threatUnitSeconds > 0 and (
+					SafeNumber(stats.threatStatus2Seconds)
+						+ SafeNumber(stats.threatStatus3Seconds)
+				) / threatUnitSeconds or nil,
+				enemyTargetRate = threatUnitSeconds > 0
+					and SafeNumber(stats.enemyTargetSeconds)
+						/ threatUnitSeconds or nil,
+			},
 			rawStats = CopyCurrentStats(stats),
 			level = GetParticipantLevel(participant),
 			eligible = participant.eligible and true or false,
@@ -4543,6 +4875,7 @@ BuildCurrentDungeonSnapshot = function(finished)
 			fallbackEncounterStarts = SafeNumber(sample.fallbackEncounterStarts),
 		},
 		rows = snapshotRows,
+		deathAttributionSummary = BuildDeathAttributionSummary(snapshotRows),
 			healthSummary = {
 			observedSeconds = healingContext.observedSeconds,
 			below75Seconds = healingContext.below75Seconds,
@@ -4654,7 +4987,7 @@ local function BuildDiagnosticRecord(snapshot, reason)
 	end
 	local build, _, buildDate, interfaceVersion = GetBuildInfo()
 	return {
-		schemaVersion = 9,
+		schemaVersion = 10,
 		healerFormulaVersion = GetSnapshotHealerFormulaVersion(snapshot),
 		tankFormulaVersion = snapshot.tankFormulaVersion or TANK_SCORE_VERSION,
 		addonVersion = API and API.VERSION or "?",
@@ -4680,6 +5013,7 @@ local function BuildDiagnosticRecord(snapshot, reason)
 		wipes = snapshot.wipes,
 		averageRating = snapshot.averageRating,
 		healthSummary = snapshot.healthSummary,
+		deathAttributionSummary = snapshot.deathAttributionSummary,
 		sampleTotals = snapshot.sampleTotals,
 		rows = snapshot.rows,
 		formula = {
@@ -4753,6 +5087,12 @@ local function BuildDiagnosticRecord(snapshot, reason)
 				earlyHealingWindowSeconds = EARLY_HEAL_THREAT_WINDOW,
 				storesIncomingSpells = true,
 				storesTankControlState = true,
+				storesExactThreatLevels = true,
+				storesEnemyCurrentTarget = true,
+				storesRecentThreatActionsForAllRoles = true,
+				storesActiveAurasAtDeath = true,
+				appliesToAllRoles = true,
+				affectsScoring = false,
 				advisoryOnly = true,
 			},
 			ratingReferenceScore = 100,
