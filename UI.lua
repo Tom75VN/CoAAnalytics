@@ -1505,6 +1505,35 @@ local function SetSettingsMode(mode)
 	end
 end
 
+function UI.RefreshMythicResetCard()
+	if not ui.mythicResetStatusText then
+		return
+	end
+	local module = CoAAnalyticsAddon.Modules.MythicReset
+	local status = module and module.GetStatus and module.GetStatus()
+	if not status then
+		ui.mythicResetStatusText:SetText("Heure non disponible")
+		ui.mythicResetStatusText:SetTextColor(0.95, 0.55, 0.20)
+		ui.mythicResetDetailText:SetText(
+			"Le module de suivi n'est pas charge. Fais /reload puis reouvre cette page."
+		)
+		return
+	end
+	ui.mythicResetStatusText:SetText(status.text)
+	if status.known and status.confidence == "direct" then
+		ui.mythicResetStatusText:SetTextColor(0.18, 0.90, 0.45)
+	elseif status.known then
+		ui.mythicResetStatusText:SetTextColor(0.95, 0.78, 0.18)
+	else
+		ui.mythicResetStatusText:SetTextColor(0.95, 0.55, 0.20)
+	end
+	local detail = status.detail or ""
+	if status.counterText then
+		detail = status.counterText .. "\n" .. detail
+	end
+	ui.mythicResetDetailText:SetText(detail)
+end
+
 local function SetSettingsSection(section)
 	if section == "nameplates" then
 		ui.activeSettingsMode = "nameplates"
@@ -1547,6 +1576,7 @@ local function SetSettingsSection(section)
 	end
 	if section == "home" then
 		ui.dashboardPanel:Show()
+		UI.RefreshMythicResetCard()
 	elseif section == "performance" then
 		ui.performanceNavigationPanel:Show()
 		if ui.activePerformanceTab == "ranking" then
@@ -1729,6 +1759,43 @@ local function CreateSettingsFrame()
 		local targetSection = item[3]
 		openButton:SetScript("OnClick", function() SetSettingsSection(targetSection) end)
 	end
+
+	local resetCard = CreateFrame("Frame", nil, ui.dashboardPanel)
+	resetCard:SetPoint("TOPLEFT", ui.dashboardPanel, "TOPLEFT", 10, -418)
+	resetCard:SetPoint("TOPRIGHT", ui.dashboardPanel, "TOPRIGHT", -10, -418)
+	resetCard:SetHeight(135)
+	resetCard:SetBackdrop({
+		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true, tileSize = 16, edgeSize = 10,
+		insets = { left = 3, right = 3, top = 3, bottom = 3 },
+	})
+	resetCard:SetBackdropColor(0.05, 0.055, 0.07, 0.96)
+	resetCard:SetBackdropBorderColor(0.30, 0.72, 0.95, 0.8)
+	local resetTitle = resetCard:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	resetTitle:SetPoint("TOPLEFT", resetCard, "TOPLEFT", 16, -14)
+	resetTitle:SetText("Limites Mythic+")
+	ui.mythicResetStatusText = resetCard:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	ui.mythicResetStatusText:SetPoint("TOPLEFT", resetTitle, "BOTTOMLEFT", 0, -9)
+	ui.mythicResetStatusText:SetWidth(535)
+	ui.mythicResetStatusText:SetJustifyH("LEFT")
+	ui.mythicResetDetailText = resetCard:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	ui.mythicResetDetailText:SetPoint("TOPLEFT", ui.mythicResetStatusText, "BOTTOMLEFT", 0, -7)
+	ui.mythicResetDetailText:SetWidth(535)
+	ui.mythicResetDetailText:SetHeight(40)
+	ui.mythicResetDetailText:SetJustifyH("LEFT")
+	ui.mythicResetDetailText:SetJustifyV("TOP")
+	ui.mythicResetDetailText:SetWordWrap(true)
+	local refreshResetButton = CreateModernTab(resetCard, "Actualiser", 0.30, 0.72, 0.95)
+	refreshResetButton:SetWidth(125)
+	refreshResetButton:SetPoint("RIGHT", resetCard, "RIGHT", -16, 0)
+	refreshResetButton:SetScript("OnClick", function()
+		local module = CoAAnalyticsAddon.Modules.MythicReset
+		if module and module.RequestRefresh then
+			module.RequestRefresh(false)
+		end
+	end)
+	UI.RefreshMythicResetCard()
 
 	ui.advisorHostPanel = CreateFrame("Frame", nil, frame)
 	ui.advisorHostPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 184, -52)
@@ -2870,4 +2937,7 @@ API.GetClassDisplayName = GetRankingClassName
 CoAAnalyticsAddon.Events:Register("BG_RANKING_UPDATED", UI.NotifyRankingChanged)
 CoAAnalyticsAddon.Events:Register("PVE_DIAGNOSTIC_STATUS_UPDATED", function()
 	RefreshSettingsControls()
+end)
+CoAAnalyticsAddon.Events:Register("MYTHIC_RESET_UPDATED", function()
+	UI.RefreshMythicResetCard()
 end)

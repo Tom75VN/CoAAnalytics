@@ -2,12 +2,18 @@
 
 A unified performance analysis and character-advice addon for World of Warcraft: Ascension.
 
+[Download the latest complete release](https://github.com/Tom75VN/CoAAnalytics/releases/latest/download/CoAAnalytics.zip)
+
+The release archive includes both `CoAAnalytics` and the optional
+`CoAAnalytics_DataProbe` collector.
+
 ## Features
 
 - Battleground rankings for specializations and players
 - Role-based scoring for dungeons and raids
 - Live dungeon performance ratings
 - Mythic 0 Keystone boss identification, required boss-order drawer, and English party sharing
+- Mythic+ weekly-limit reset countdown from Ascension's lockout timer, with a remembered-cycle fallback
 - Pet, guardian, healing, threat, and utility tracking
 - Per-death spell, aura, exact-threat, and aggro diagnostics for every role
 - Class-aware talent, stat, equipment, tooltip, and loot recommendations
@@ -31,5 +37,8 @@ legacy routes that still need public CoA confirmation. The share button (or
 
 Use `/coaa` to open the unified home page. Advisor commands are available
 under `/coaa advisor`, and DataProbe opens with `/coaa collection`.
+Use `/coaa reset` to print the next Mythic+ cache/coin limit reset.
+The same status is shown on the Home page. Use `/coaa reset actualiser`
+after obtaining a raid boss lockout to request a fresh server measurement.
 
 Player data and diagnostic logs remain local in the game's `WTF` folder.

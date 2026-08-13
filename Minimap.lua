@@ -137,6 +137,30 @@ local function CreateMinimapButton()
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
 		GameTooltip:AddLine("CoA Analytics", 0, 0.73, 0.47)
 		GameTooltip:AddLine("Clic gauche : reglages", 1, 1, 1)
+		local resetModule = CoAAnalyticsAddon.Modules.MythicReset
+		if resetModule and resetModule.GetStatus then
+			local resetStatus = resetModule.GetStatus()
+			GameTooltip:AddLine(resetStatus.text, 0.30, 0.82, 1.00)
+			if resetStatus.counterText then
+				GameTooltip:AddLine(resetStatus.counterText, 0.82, 0.82, 0.82)
+			end
+			if resetStatus.known and resetStatus.confidence ~= "direct" then
+				GameTooltip:AddLine(
+					"Estimation : reset serveur du mercredi",
+					0.62,
+					0.65,
+					0.72
+				)
+			elseif not resetStatus.known then
+				GameTooltip:AddLine(
+					"Mesure exacte : verrouillage de raid, puis /coaa reset actualiser",
+					0.62,
+					0.65,
+					0.72,
+					true
+				)
+			end
+		end
 		GameTooltip:AddLine("Glisser : deplacer le bouton", 0.72, 0.72, 0.72)
 		GameTooltip:Show()
 	end)

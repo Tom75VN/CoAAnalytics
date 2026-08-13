@@ -1,5 +1,5 @@
 local ADDON_NAME = ...
-local ADDON_VERSION = CoAAnalyticsAddon and CoAAnalyticsAddon.VERSION or "2.17.3"
+local ADDON_VERSION = CoAAnalyticsAddon and CoAAnalyticsAddon.VERSION or "2.18.2"
 
 local ICON_SIZE = 18
 local ICON_OFFSET_Y = 3
@@ -1293,6 +1293,11 @@ driver:SetScript("OnEvent", function(_, event, value)
 		then
 			CoAAnalyticsAddon.Modules.DungeonOverlay.Initialize()
 		end
+		if CoAAnalyticsAddon.Modules.MythicReset
+			and CoAAnalyticsAddon.Modules.MythicReset.Initialize
+		then
+			CoAAnalyticsAddon.Modules.MythicReset.Initialize()
+		end
 		if CoAAnalyticsAddon.Modules.Minimap
 			and CoAAnalyticsAddon.Modules.Minimap.Initialize
 		then
@@ -1543,6 +1548,20 @@ SlashCmdList.COAANALYTICS = function(message)
 			module.Refresh()
 			module.ShareCurrent()
 		end
+	elseif message == "reset actualiser" or message == "reset refresh"
+		or message == "m+ reset actualiser"
+	then
+		local module = CoAAnalyticsAddon.Modules.MythicReset
+		if module and module.RequestRefresh then
+			module.RequestRefresh(true)
+		end
+	elseif message == "reset" or message == "m+ reset"
+		or message == "reset m+" or message == "mythic reset"
+	then
+		local module = CoAAnalyticsAddon.Modules.MythicReset
+		if module and module.PrintStatus then
+			module.PrintStatus()
+		end
 	elseif (message == "pve log" or message == "pve log status") and CoAAnalyticsPvE then
 		CoAAnalyticsPvE.PrintDungeonDiagnosticStatus()
 	elseif (message == "pve log on" or message == "pve log start") and CoAAnalyticsPvE then
@@ -1587,7 +1606,7 @@ SlashCmdList.COAANALYTICS = function(message)
 				.. (state.pendingInspect and ", inspecting 1" or "")
 		)
 	else
-		Chat("/coaa | performance | advisor | loot | combat | collection | settings | boss | boss share | pve log on|off|status|clear | language fr|en | log | status | debug | retry")
+		Chat("/coaa | performance | advisor | loot | combat | collection | settings | boss | boss share | reset | pve log on|off|status|clear | language fr|en | log | status | debug | retry")
 	end
 end
 
