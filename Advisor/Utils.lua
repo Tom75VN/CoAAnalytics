@@ -9,27 +9,36 @@ _G.CoAAnalyticsAdvisor = Advisor
 
 -- Advisor conserve son propre schema interne, mais ses donnees font maintenant
 -- partie de l'unique SavedVariable de CoA Analytics.
-if type(_G.CoAAnalyticsDB) ~= "table" then
-    _G.CoAAnalyticsDB = {}
-end
-if type(_G.CoAAnalyticsDB.advisor) ~= "table" then
-    _G.CoAAnalyticsDB.advisor = {}
-end
-_G.CoAAnalyticsAdvisorDB = _G.CoAAnalyticsDB.advisor
-
-Advisor.name = "CoAAnalytics"
-Advisor.version = Addon.VERSION or "2.17.3"
-Advisor.interface = 30300
-
-function Advisor.GetDatabase()
+local function BindAdvisorDatabase()
+    local detached = type(_G.CoAAnalyticsAdvisorDB) == "table" and
+        _G.CoAAnalyticsAdvisorDB or nil
     if type(_G.CoAAnalyticsDB) ~= "table" then
         _G.CoAAnalyticsDB = {}
     end
     if type(_G.CoAAnalyticsDB.advisor) ~= "table" then
         _G.CoAAnalyticsDB.advisor = {}
     end
-    _G.CoAAnalyticsAdvisorDB = _G.CoAAnalyticsDB.advisor
-    return _G.CoAAnalyticsAdvisorDB
+    local database = _G.CoAAnalyticsDB.advisor
+    -- A few older modules could recreate the compatibility alias as a new
+    -- table. Recover its in-memory changes before binding it back to the only
+    -- SavedVariables tree, otherwise UI choices vanish after reopening/reload.
+    if detached and detached ~= database then
+        for key, value in pairs(detached) do
+            database[key] = value
+        end
+    end
+    _G.CoAAnalyticsAdvisorDB = database
+    return database
+end
+
+BindAdvisorDatabase()
+
+Advisor.name = "CoAAnalytics"
+Advisor.version = Addon.VERSION or "3.0.0"
+Advisor.interface = 30300
+
+function Advisor.GetDatabase()
+    return BindAdvisorDatabase()
 end
 
 function Advisor.SafeCall(fn, ...)

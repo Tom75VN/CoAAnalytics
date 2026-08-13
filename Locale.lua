@@ -15,6 +15,22 @@ local ENGLISH = {
 	["BG"] = "Battlegrounds",
 	["Session PvE"] = "PvE Session",
 	["Vue d'ensemble"] = "Overview",
+	["Plafonds Mythic+"] = "Mythic+ Caps",
+	["Hausse des plafonds M+ : "] = "Mythic+ cap increase: ",
+	["Hausse estimee des plafonds M+ : "] = "Estimated Mythic+ cap increase: ",
+	["heure non detectee"] = "time not detected",
+	["Prochaine augmentation : "] = "Next increase: ",
+	["Actualiser"] = "Refresh",
+	["Actualiser interroge les timers hebdomadaires du client. Sans timer direct, l'addon affiche une estimation sur le reset de raid."] =
+		"Refresh queries the client's weekly timers. Without a direct timer, the addon estimates the next raid reset.",
+	["Timer hebdomadaire lu directement depuis le client."] =
+		"Weekly timer read directly from the client.",
+	["Estimation basee sur le reset de raid hebdomadaire."] =
+		"Estimate based on the weekly raid reset.",
+	["Estimation : prochain reset de raid"] =
+		"Estimate: next raid reset",
+	["Actualiser : /coaa reset actualiser"] =
+		"Refresh: /coaa reset refresh",
 	["Ouvrir"] = "Open",
 	["Analyse de combat"] = "Combat Analysis",
 	["Voir les performances"] = "View Performance",

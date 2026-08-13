@@ -13,7 +13,7 @@ The release archive includes both `CoAAnalytics` and the optional
 - Role-based scoring for dungeons and raids
 - Live dungeon performance ratings
 - Mythic 0 Keystone boss identification, required boss-order drawer, and English party sharing
-- Mythic+ weekly-limit reset countdown from Ascension's lockout timer, with a remembered-cycle fallback
+- Mythic+ cache and Mythic Coin counters read from Edrim, plus the next weekly cap increase synced to Ascension's raid reset
 - Pet, guardian, healing, threat, and utility tracking
 - Per-death spell, aura, exact-threat, and aggro diagnostics for every role
 - Class-aware talent, stat, equipment, tooltip, and loot recommendations
@@ -37,8 +37,8 @@ legacy routes that still need public CoA confirmation. The share button (or
 
 Use `/coaa` to open the unified home page. Advisor commands are available
 under `/coaa advisor`, and DataProbe opens with `/coaa collection`.
-Use `/coaa reset` to print the next Mythic+ cache/coin limit reset.
-The same status is shown on the Home page. Use `/coaa reset actualiser`
-after obtaining a raid boss lockout to request a fresh server measurement.
+Use `/coaa reset` to print the next Mythic+ cache/coin cap increase.
+The same status and the latest Edrim counters are shown at the top of the
+Home page. Use `/coaa reset actualiser` to query the client timers again.
 
 Player data and diagnostic logs remain local in the game's `WTF` folder.

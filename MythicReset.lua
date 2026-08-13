@@ -173,7 +173,7 @@ local function AdvanceStoredCycle(now)
 	end
 	while nextResetAt <= now do
 		nextResetAt = nextResetAt + WEEK_SECONDS
-		resetDB.source = "cycle memorise"
+		resetDB.source = "cycle hebdomadaire memorise"
 		resetDB.confidence = "estimated"
 	end
 	resetDB.nextResetAt = nextResetAt
@@ -210,16 +210,16 @@ function Module.Refresh()
 		return seconds, source, "direct"
 	end
 	local now = GetServerEpoch()
-	seconds = AdvanceStoredCycle(now)
-	if seconds then
-		return seconds, resetDB.source, resetDB.confidence
-	end
 	seconds = QueryEstimatedWednesdayReset()
 	if seconds then
 		resetDB.nextResetAt = now + seconds
 		resetDB.observedAt = now
-		resetDB.source = "reset serveur du mercredi"
+		resetDB.source = "reset de raid hebdomadaire"
 		resetDB.confidence = "estimated"
+		return seconds, resetDB.source, resetDB.confidence
+	end
+	seconds = AdvanceStoredCycle(now)
+	if seconds then
 		return seconds, resetDB.source, resetDB.confidence
 	end
 	return nil
@@ -254,7 +254,7 @@ local function GetCounterText()
 	end
 	if type(counters.coins) == "table" then
 		values[#values + 1] = string.format(
-			"Coins %d/%d",
+			"Mythic Coins %d/%d",
 			tonumber(counters.coins.current) or 0,
 			tonumber(counters.coins.maximum) or 0
 		)
@@ -267,8 +267,8 @@ function Module.GetStatus()
 	if not seconds then
 		return {
 			known = false,
-			text = "Reset M+ : heure non detectee",
-			detail = "Mesure exacte : vaincre un boss de raid, puis cliquer sur Actualiser.",
+			text = "Hausse des plafonds M+ : heure non detectee",
+			detail = "Actualiser interroge les timers hebdomadaires du client. Sans timer direct, l'addon affiche une estimation sur le reset de raid.",
 			counterText = GetCounterText(),
 		}
 	end
@@ -285,12 +285,14 @@ function Module.GetStatus()
 		confidence = confidence,
 		localDate = localDate,
 		counterText = GetCounterText(),
-		text = (confidence == "direct" and "Reset M+ : " or "Reset M+ estime : ")
+		text = (confidence == "direct"
+			and "Hausse des plafonds M+ : "
+			or "Hausse estimee des plafonds M+ : ")
 			.. FormatDuration(seconds),
-		detail = (localDate and ("Prochain reset : " .. localDate .. " (heure locale). ") or "")
+		detail = (localDate and ("Prochaine augmentation : " .. localDate .. " (heure locale). ") or "")
 			.. (confidence == "direct"
-				and "Timer hebdomadaire lu directement sur le serveur."
-				or "Estimation basee sur le reset serveur du mercredi."),
+				and "Timer hebdomadaire lu directement depuis le client."
+				or "Estimation basee sur le reset de raid hebdomadaire."),
 	}
 end
 
@@ -301,13 +303,13 @@ end
 function Module.PrintStatus()
 	local status = Module.GetStatus()
 	if not status.known then
-		Chat("Heure du reset M+ non detectee. Pour une mesure exacte : vaincs au moins un boss de raid, puis utilise /coaa reset actualiser. Ouvrir Edrim ne fournit que les compteurs, pas l'heure.")
+		Chat("Heure de la prochaine hausse M+ non detectee. Utilise /coaa reset actualiser pour interroger les timers hebdomadaires. Edrim fournit les compteurs, mais pas l'heure.")
 		return
 	end
 	local precision = status.confidence == "direct" and "mesure directe" or "estimation"
 	local dateText = status.localDate and (", " .. status.localDate .. " heure locale") or ""
 	Chat(string.format(
-		"Reset des limites M+ dans %s%s (%s, %s).",
+		"Augmentation des plafonds M+ dans %s%s (%s, %s).",
 		FormatDuration(status.seconds),
 		dateText,
 		tostring(status.source or "source inconnue"),
@@ -349,12 +351,18 @@ local function SaveCounter(kind, current, maximum)
 	end
 	local now = GetServerEpoch()
 	local previous = resetDB.counters and resetDB.counters[kind]
-	if previous and current < (tonumber(previous.current) or 0) then
+	local counterRolledOver = previous
+		and current < (tonumber(previous.current) or 0)
+	local capIncreased = previous
+		and maximum > (tonumber(previous.maximum) or 0)
+	if counterRolledOver or capIncreased then
 		local previousSeenAt = tonumber(previous.seenAt) or 0
 		if previousSeenAt > 0 and now - previousSeenAt <= COUNTER_OBSERVATION_WINDOW then
 			resetDB.nextResetAt = now + WEEK_SECONDS
 			resetDB.observedAt = now
-			resetDB.source = "reset des compteurs observe"
+			resetDB.source = capIncreased
+				and "augmentation des plafonds observee"
+				or "cycle des compteurs observe"
 			resetDB.confidence = "estimated"
 		end
 	end
@@ -371,16 +379,17 @@ function Module.CaptureCountersFromText(text)
 		return false
 	end
 	local current, maximum = text:match("Mythical Caches Opened:%s*(%d+)%s*/%s*(%d+)")
+	local captured = false
 	if current then
 		SaveCounter("caches", tonumber(current), tonumber(maximum))
-		return true
+		captured = true
 	end
 	current, maximum = text:match("Mythic Coins Obtained:%s*(%d+)%s*/%s*(%d+)")
 	if current then
 		SaveCounter("coins", tonumber(current), tonumber(maximum))
-		return true
+		captured = true
 	end
-	return false
+	return captured
 end
 
 local function ScanVisibleFrameText()

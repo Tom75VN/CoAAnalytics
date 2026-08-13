@@ -2106,7 +2106,7 @@ local function BuildCollectionPanel(parent)
     local panel = CreateFrame("Frame", nil, parent)
     panel:SetAllPoints(parent)
 
-    local statusSection = CreateSection(panel, -2, 108)
+    local statusSection = CreateSection(panel, -2, 132)
     CreateText(
         statusSection, "GameFontNormal",
         "1. Prépare une contribution communautaire", 12, -10, 360
@@ -2124,10 +2124,10 @@ local function BuildCollectionPanel(parent)
         Color("blue", "Détection automatique : ") ..
         "BG, arène, donjon, raid, monde et PvP sauvage sont classés " ..
         "séparément pour chaque combat.",
-        12, -80, 548
+        12, -90, 548
     )
 
-    local instructionsSection = CreateSection(panel, -118, 250)
+    local instructionsSection = CreateSection(panel, -142, 250)
     CreateText(
         instructionsSection, "GameFontNormal",
         "2. Capture le build avant de jouer", 12, -10, 330
@@ -2169,7 +2169,7 @@ local function BuildCollectionPanel(parent)
     )
     dataProbeNewSessionButton:SetScript("OnClick", NewDataProbeSession)
 
-    local progressSection = CreateSection(panel, -376, 92)
+    local progressSection = CreateSection(panel, -400, 92)
     CreateText(
         progressSection, "GameFontNormal",
         "5. Vérifie les données disponibles", 12, -10, 520
@@ -2178,7 +2178,7 @@ local function BuildCollectionPanel(parent)
         progressSection, "GameFontHighlightSmall", "", 12, -32, 548
     )
 
-    local exportSection = CreateSection(panel, -476, 105)
+    local exportSection = CreateSection(panel, -500, 105)
     CreateText(
         exportSection, "GameFontNormal",
         "6. Termine et partage le fichier", 12, -10, 350
@@ -2293,7 +2293,7 @@ local function BuildAutoLootPanel(parent)
         autoLootStatChecks[option.key] = checkbox
     end
 
-    local statusSection = CreateSection(panel, -508, 120)
+    local statusSection = CreateSection(panel, -508, 132)
     CreateText(
         statusSection, "GameFontNormal",
         "3. Résumé du filtre", 12, -10, 300
@@ -2311,7 +2311,7 @@ local function BuildAutoLootPanel(parent)
         Color("red", "Attention : ") ..
         "Endurance, Intelligence et Résilience sont fréquentes. Les exclure " ..
         "peut envoyer en Cupidité des améliorations utiles.",
-        12, -76, 560
+        12, -84, 560
     )
 
     panel:Hide()
@@ -2400,7 +2400,7 @@ local function Build(parent)
     title:SetTextColor(1, 0.82, 0.2)
     local version = mainFrame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     version:SetPoint("LEFT", title, "RIGHT", 8, -1)
-    version:SetText("v" .. tostring(Advisor.version or "2.17.3"))
+    version:SetText("v" .. tostring(Advisor.version or "3.0.0"))
     local subtitle = CreateText(
         mainFrame, "GameFontDisableSmall",
         "Recommandations de classe et collecte communautaire DataProbe",
@@ -2486,7 +2486,7 @@ local function Build(parent)
             CreateTalentCard(talentSection, priority, 12 + (priority - 1) * 214)
     end
 
-    local profileSection = CreateSection(mainFrame, -365, 123)
+    local profileSection = CreateSection(mainFrame, -365, 147)
     advisorWidgets[#advisorWidgets + 1] = profileSection
     CreateText(
         profileSection, "GameFontNormal",
@@ -2522,7 +2522,7 @@ local function Build(parent)
         profileButtons[index] = button
     end
 
-    local itemSection = CreateSection(mainFrame, -496, 83)
+    local itemSection = CreateSection(mainFrame, -520, 83)
     advisorWidgets[#advisorWidgets + 1] = itemSection
     CreateText(
         itemSection, "GameFontNormal",
@@ -2538,7 +2538,7 @@ local function Build(parent)
         "TOPRIGHT", itemSection, "TOPRIGHT", -13, -8
     )
     adviceButton:SetScript("OnClick", ToggleAdvice)
-    local combatSection = CreateSection(mainFrame, -587, 145)
+    local combatSection = CreateSection(mainFrame, -611, 128)
     advisorWidgets[#advisorWidgets + 1] = combatSection
     combatTitleText = CreateText(
         combatSection, "GameFontNormal",
@@ -2573,7 +2573,7 @@ local function Build(parent)
     feedbackText = CreateText(
         mainFrame, "GameFontHighlightSmall",
         "Astuce : déplace le bouton de minimap en le faisant glisser.",
-        22, -741, 656, "CENTER"
+        22, -746, 656, "CENTER"
     )
     advisorWidgets[#advisorWidgets + 1] = feedbackText
 

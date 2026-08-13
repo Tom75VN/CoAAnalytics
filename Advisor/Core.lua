@@ -6,7 +6,12 @@ local refreshReason
 Advisor.Actions = Advisor.Actions or {}
 
 local function EnsureDB()
-    if type(CoAAnalyticsAdvisorDB) ~= "table" then CoAAnalyticsAdvisorDB = {} end
+    local database = Advisor.GetDatabase and Advisor.GetDatabase() or
+        CoAAnalyticsAdvisorDB
+    if type(database) ~= "table" then
+        database = {}
+        CoAAnalyticsAdvisorDB = database
+    end
     if CoAAnalyticsAdvisorDB.language ~= "en" and
         CoAAnalyticsAdvisorDB.language ~= "fr" then
         CoAAnalyticsAdvisorDB.language = "fr"
@@ -68,26 +73,27 @@ local function EnsureDB()
         CoAAnalyticsAdvisorDB.contentMode = "pvp"
     end
     CoAAnalyticsAdvisorDB.version = Advisor.version
+    return database
 end
 
 function Advisor.GetSelectedContentMode()
-    EnsureDB()
+    local database = EnsureDB()
     local classProfile = Advisor.Data.GetActiveClassProfile()
     return Advisor.Data.NormalizeContentMode(
-        CoAAnalyticsAdvisorDB.contentMode,
+        database.contentMode,
         classProfile
     )
 end
 
 function Advisor.GetSelectedProfileKey()
-    EnsureDB()
+    local database = EnsureDB()
     local classProfile = Advisor.Data.GetActiveClassProfile()
     local contentMode = Advisor.Data.NormalizeContentMode(
-        CoAAnalyticsAdvisorDB.contentMode,
+        database.contentMode,
         classProfile
     )
     return Advisor.Data.NormalizeProfileKey(
-        CoAAnalyticsAdvisorDB.profile,
+        database.profile,
         classProfile,
         contentMode
     )
@@ -277,10 +283,10 @@ local function SetProfile(profileKey, announce)
         end
         return false
     end
-    EnsureDB()
-    CoAAnalyticsAdvisorDB.profile = profileKey
-    CoAAnalyticsAdvisorDB.profilesBySpecialization[classProfile.key] = profileKey
-    CoAAnalyticsAdvisorDB.profilesBySpecializationContext[
+    local database = EnsureDB()
+    database.profile = profileKey
+    database.profilesBySpecialization[classProfile.key] = profileKey
+    database.profilesBySpecializationContext[
         classProfile.key .. ":" .. contentMode
     ] = profileKey
     if announce ~= false then
@@ -301,22 +307,22 @@ local function SetContentMode(contentMode, announce)
     local classProfile = Advisor.Data.GetActiveClassProfile()
     if not classProfile then return false end
     contentMode = Advisor.Data.NormalizeContentMode(contentMode, classProfile)
-    EnsureDB()
-    CoAAnalyticsAdvisorDB.contentModesBySpecialization[classProfile.key] =
+    local database = EnsureDB()
+    database.contentModesBySpecialization[classProfile.key] =
         contentMode
-    CoAAnalyticsAdvisorDB.contentMode = contentMode
+    database.contentMode = contentMode
 
     local contextKey = classProfile.key .. ":" .. contentMode
     local stored =
-        CoAAnalyticsAdvisorDB.profilesBySpecializationContext[contextKey]
+        database.profilesBySpecializationContext[contextKey]
     stored = Advisor.Data.NormalizeProfileKey(
         stored,
         classProfile,
         contentMode
     )
-    CoAAnalyticsAdvisorDB.profilesBySpecializationContext[contextKey] = stored
-    CoAAnalyticsAdvisorDB.profilesBySpecialization[classProfile.key] = stored
-    CoAAnalyticsAdvisorDB.profile = stored
+    database.profilesBySpecializationContext[contextKey] = stored
+    database.profilesBySpecialization[classProfile.key] = stored
+    database.profile = stored
 
     if announce ~= false then
         local context = Advisor.Data.GetContext(classProfile, contentMode)
@@ -355,11 +361,11 @@ Advisor.Actions.SetContentMode = function(contentMode, announce)
 end
 
 Advisor.Actions.SetEnabled = function(enabled, announce)
-    EnsureDB()
-    CoAAnalyticsAdvisorDB.enabled = enabled and true or false
+    local database = EnsureDB()
+    database.enabled = enabled and true or false
     if announce ~= false then
         Advisor.Print(
-            CoAAnalyticsAdvisorDB.enabled and
+            database.enabled and
             "conseils d'objets activés." or
             "conseils d'objets désactivés."
         )

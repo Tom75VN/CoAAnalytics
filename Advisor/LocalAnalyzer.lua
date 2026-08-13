@@ -18,11 +18,11 @@ local MODE_LABELS = {
 }
 
 local function DB()
-    if type(CoAAnalyticsAdvisorDB) ~= "table" then CoAAnalyticsAdvisorDB = {} end
-    if type(CoAAnalyticsAdvisorDB.localAnalysis) ~= "table" then
-        CoAAnalyticsAdvisorDB.localAnalysis = {}
+    local database = Advisor.GetDatabase()
+    if type(database.localAnalysis) ~= "table" then
+        database.localAnalysis = {}
     end
-    local db = CoAAnalyticsAdvisorDB.localAnalysis
+    local db = database.localAnalysis
     if db.enabled == nil then db.enabled = true end
     if type(db.profiles) ~= "table" then db.profiles = {} end
     db.schemaVersion = 1

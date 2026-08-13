@@ -4,11 +4,11 @@ Advisor.DataProbe = Advisor.DataProbe or {}
 local Controller = Advisor.DataProbe
 
 local function Settings()
-    if type(CoAAnalyticsAdvisorDB) ~= "table" then CoAAnalyticsAdvisorDB = {} end
-    if type(CoAAnalyticsAdvisorDB.dataProbeSettings) ~= "table" then
-        CoAAnalyticsAdvisorDB.dataProbeSettings = {}
+    local database = Advisor.GetDatabase()
+    if type(database.dataProbeSettings) ~= "table" then
+        database.dataProbeSettings = {}
     end
-    local settings = CoAAnalyticsAdvisorDB.dataProbeSettings
+    local settings = database.dataProbeSettings
     if settings.enabled == nil then settings.enabled = false end
     return settings
 end

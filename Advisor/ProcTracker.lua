@@ -33,11 +33,11 @@ local function L(text)
 end
 
 local function EnsureDB()
-    if type(CoAAnalyticsAdvisorDB) ~= "table" then CoAAnalyticsAdvisorDB = {} end
-    if type(CoAAnalyticsAdvisorDB.procTracker) ~= "table" then
-        CoAAnalyticsAdvisorDB.procTracker = {}
+    local database = Advisor.GetDatabase()
+    if type(database.procTracker) ~= "table" then
+        database.procTracker = {}
     end
-    return CoAAnalyticsAdvisorDB.procTracker
+    return database.procTracker
 end
 
 local function NormalizeName(value)

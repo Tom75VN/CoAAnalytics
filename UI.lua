@@ -1733,7 +1733,7 @@ local function CreateSettingsFrame()
 		card:SetHeight(150)
 		local column = (index - 1) % 2
 		local row = math.floor((index - 1) / 2)
-		card:SetPoint("TOPLEFT", ui.dashboardPanel, "TOPLEFT", 10 + column * 366, -82 - row * 168)
+		card:SetPoint("TOPLEFT", ui.dashboardPanel, "TOPLEFT", 10 + column * 366, -222 - row * 168)
 		card:SetBackdrop({
 			bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
 			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -1761,9 +1761,9 @@ local function CreateSettingsFrame()
 	end
 
 	local resetCard = CreateFrame("Frame", nil, ui.dashboardPanel)
-	resetCard:SetPoint("TOPLEFT", ui.dashboardPanel, "TOPLEFT", 10, -418)
-	resetCard:SetPoint("TOPRIGHT", ui.dashboardPanel, "TOPRIGHT", -10, -418)
-	resetCard:SetHeight(135)
+	resetCard:SetPoint("TOPLEFT", ui.dashboardPanel, "TOPLEFT", 10, -82)
+	resetCard:SetPoint("TOPRIGHT", ui.dashboardPanel, "TOPRIGHT", -10, -82)
+	resetCard:SetHeight(126)
 	resetCard:SetBackdrop({
 		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
 		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -1774,7 +1774,7 @@ local function CreateSettingsFrame()
 	resetCard:SetBackdropBorderColor(0.30, 0.72, 0.95, 0.8)
 	local resetTitle = resetCard:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 	resetTitle:SetPoint("TOPLEFT", resetCard, "TOPLEFT", 16, -14)
-	resetTitle:SetText("Limites Mythic+")
+	resetTitle:SetText("Plafonds Mythic+")
 	ui.mythicResetStatusText = resetCard:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	ui.mythicResetStatusText:SetPoint("TOPLEFT", resetTitle, "BOTTOMLEFT", 0, -9)
 	ui.mythicResetStatusText:SetWidth(535)
@@ -1782,7 +1782,7 @@ local function CreateSettingsFrame()
 	ui.mythicResetDetailText = resetCard:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	ui.mythicResetDetailText:SetPoint("TOPLEFT", ui.mythicResetStatusText, "BOTTOMLEFT", 0, -7)
 	ui.mythicResetDetailText:SetWidth(535)
-	ui.mythicResetDetailText:SetHeight(40)
+	ui.mythicResetDetailText:SetHeight(44)
 	ui.mythicResetDetailText:SetJustifyH("LEFT")
 	ui.mythicResetDetailText:SetJustifyV("TOP")
 	ui.mythicResetDetailText:SetWordWrap(true)

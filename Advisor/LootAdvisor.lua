@@ -60,41 +60,52 @@ local function IsTrue(value)
 end
 
 local function EnsureSettings()
-    if type(_G.CoAAnalyticsAdvisorDB) ~= "table" then
-        _G.CoAAnalyticsAdvisorDB = {}
+    local database = Advisor.GetDatabase and Advisor.GetDatabase() or
+        _G.CoAAnalyticsAdvisorDB
+    if type(database) ~= "table" then
+        database = {}
+        _G.CoAAnalyticsAdvisorDB = database
     end
-    if _G.CoAAnalyticsAdvisorDB.autoGreedIncompatibleLoot == nil then
-        _G.CoAAnalyticsAdvisorDB.autoGreedIncompatibleLoot =
-            _G.CoAAnalyticsAdvisorDB.autoPassIncompatibleLoot == true
+    if database.autoGreedIncompatibleLoot == nil then
+        database.autoGreedIncompatibleLoot =
+            database.autoPassIncompatibleLoot == true
     end
-    if type(_G.CoAAnalyticsAdvisorDB.autoGreedExcludedStatsByCharacter) ~= "table" then
-        _G.CoAAnalyticsAdvisorDB.autoGreedExcludedStatsByCharacter = {}
+    if type(database.autoGreedExcludedStatsByCharacter) ~= "table" then
+        database.autoGreedExcludedStatsByCharacter = {}
     end
+    return database
 end
 
 local function GetCharacterFilterKey()
+    local guid = Advisor.SafeCall(UnitGUID, "player")
+    if type(guid) ~= "string" or guid == "" then guid = nil end
     local name = UnitName("player") or "unknown"
     local realm = type(GetRealmName) == "function" and
         GetRealmName() or "unknown"
-    return tostring(realm) .. ":" .. tostring(name)
+    local legacyKey = tostring(realm) .. ":" .. tostring(name)
+    return guid and tostring(guid) or legacyKey, legacyKey
 end
 
 local function GetCharacterExcludedStats()
-    EnsureSettings()
-    local key = GetCharacterFilterKey()
-    local byCharacter = _G.CoAAnalyticsAdvisorDB.autoGreedExcludedStatsByCharacter
+    local database = EnsureSettings()
+    local key, legacyKey = GetCharacterFilterKey()
+    local byCharacter = database.autoGreedExcludedStatsByCharacter
+    if key ~= legacyKey and type(byCharacter[key]) ~= "table" and
+        type(byCharacter[legacyKey]) == "table" then
+        byCharacter[key] = byCharacter[legacyKey]
+    end
     if type(byCharacter[key]) ~= "table" then byCharacter[key] = {} end
     return byCharacter[key]
 end
 
 function LootAdvisor.IsAutoGreedEnabled()
-    EnsureSettings()
-    return _G.CoAAnalyticsAdvisorDB.autoGreedIncompatibleLoot == true
+    local database = EnsureSettings()
+    return database.autoGreedIncompatibleLoot == true
 end
 
 function LootAdvisor.SetAutoGreedEnabled(enabled, announce)
-    EnsureSettings()
-    _G.CoAAnalyticsAdvisorDB.autoGreedIncompatibleLoot = enabled and true or false
+    local database = EnsureSettings()
+    database.autoGreedIncompatibleLoot = enabled and true or false
     if announce ~= false then
         Advisor.Print(
             enabled and
@@ -131,10 +142,9 @@ function LootAdvisor.SetStatExcluded(key, excluded)
 end
 
 function LootAdvisor.ResetExcludedStats()
-    EnsureSettings()
-    _G.CoAAnalyticsAdvisorDB.autoGreedExcludedStatsByCharacter[
-        GetCharacterFilterKey()
-    ] = {}
+    local database = EnsureSettings()
+    local key = GetCharacterFilterKey()
+    database.autoGreedExcludedStatsByCharacter[key] = {}
 end
 
 function LootAdvisor.GetExcludedStatLabels()

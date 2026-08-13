@@ -4,7 +4,7 @@ CoAAnalyticsAddon = CoAAnalyticsAddon or {}
 local Addon = CoAAnalyticsAddon
 
 Addon.NAME = ADDON_NAME or "CoAAnalytics"
-Addon.VERSION = "2.18.3"
+Addon.VERSION = "3.0.0"
 Addon.Modules = Addon.Modules or {}
 
 Addon.Events = Addon.Events or { listeners = {} }

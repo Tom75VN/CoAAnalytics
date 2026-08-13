@@ -146,14 +146,14 @@ local function CreateMinimapButton()
 			end
 			if resetStatus.known and resetStatus.confidence ~= "direct" then
 				GameTooltip:AddLine(
-					"Estimation : reset serveur du mercredi",
+					"Estimation : prochain reset de raid",
 					0.62,
 					0.65,
 					0.72
 				)
 			elseif not resetStatus.known then
 				GameTooltip:AddLine(
-					"Mesure exacte : verrouillage de raid, puis /coaa reset actualiser",
+					"Actualiser : /coaa reset actualiser",
 					0.62,
 					0.65,
 					0.72,

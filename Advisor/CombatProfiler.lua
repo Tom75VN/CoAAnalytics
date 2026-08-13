@@ -44,33 +44,32 @@ local function CurrentMode()
 end
 
 local function EnsureProfiles()
-    if type(CoAAnalyticsAdvisorDB) ~= "table" then CoAAnalyticsAdvisorDB = {} end
+    local database = Advisor.GetDatabase()
     local specializationKey = Profiler.specializationKey or
         ((Advisor.Data.GetActiveClassProfile() or {}).key) or "UNKNOWN"
     if specializationKey ~= TIME_PROFILE_KEY then
-        if type(CoAAnalyticsAdvisorDB.combatProfilesBySpecialization) ~= "table" then
-            CoAAnalyticsAdvisorDB.combatProfilesBySpecialization = {}
+        if type(database.combatProfilesBySpecialization) ~= "table" then
+            database.combatProfilesBySpecialization = {}
         end
         local profiles =
-            CoAAnalyticsAdvisorDB.combatProfilesBySpecialization[specializationKey]
+            database.combatProfilesBySpecialization[specializationKey]
         if type(profiles) ~= "table" then
             profiles = {}
-            CoAAnalyticsAdvisorDB.combatProfilesBySpecialization[
+            database.combatProfilesBySpecialization[
                 specializationKey
             ] = profiles
         end
         return profiles
     end
-    if type(CoAAnalyticsAdvisorDB.combatProfiles) ~= "table" then
-        CoAAnalyticsAdvisorDB.combatProfiles = {}
+    if type(database.combatProfiles) ~= "table" then
+        database.combatProfiles = {}
         -- Les versions précédentes ne collectaient que les sessions BG du
         -- profil Time livré. On les conserve dans le compartiment PvP.
-        if type(CoAAnalyticsAdvisorDB.combatProfile) == "table" then
-            CoAAnalyticsAdvisorDB.combatProfiles.pvp =
-                CoAAnalyticsAdvisorDB.combatProfile
+        if type(database.combatProfile) == "table" then
+            database.combatProfiles.pvp = database.combatProfile
         end
     end
-    return CoAAnalyticsAdvisorDB.combatProfiles
+    return database.combatProfiles
 end
 
 local function EnsureProfile(mode)
