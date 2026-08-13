@@ -476,11 +476,6 @@ end
 
 frame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == Advisor.name then
-        if type(_G.CoAAnalyticsDB) == "table" and
-            not _G.CoAAnalyticsDB.advisorLegacyMigrationComplete and
-            type(LoadAddOn) == "function" then
-            pcall(LoadAddOn, "CoAAdvisor")
-        end
         EnsureDB()
         Advisor.TalentScanner.LoadCache()
     elseif event == "PLAYER_LOGIN" then

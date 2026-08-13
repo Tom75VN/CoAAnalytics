@@ -1,5 +1,5 @@
 local ADDON_NAME = ...
-local ADDON_VERSION = CoAAnalyticsAddon and CoAAnalyticsAddon.VERSION or "2.18.2"
+local ADDON_VERSION = CoAAnalyticsAddon and CoAAnalyticsAddon.VERSION or "2.18.3"
 
 local ICON_SIZE = 18
 local ICON_OFFSET_Y = 3
@@ -744,9 +744,6 @@ local function InitializeDatabase()
 		CoAAnalyticsDB = {}
 	end
 	addonDB = CoAAnalyticsDB
-	if not addonDB.advisorLegacyMigrationComplete and type(LoadAddOn) == "function" then
-		pcall(LoadAddOn, "CoAAdvisor")
-	end
 	if addonDB.language ~= "fr" and addonDB.language ~= "en" then
 		addonDB.language = "fr"
 	end

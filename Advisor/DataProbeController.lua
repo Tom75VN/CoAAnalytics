@@ -20,18 +20,11 @@ end
 local function LoadEngine(announceError)
     local engine = Engine()
     if engine then return engine end
-    if type(_G.CoAAnalyticsDB) == "table" and
-        not _G.CoAAnalyticsDB.dataProbeLegacyMigrationComplete then
-        Advisor.SafeCall(LoadAddOn, "CoAAdvisor_DataProbe")
-    end
     local loaded, reason = Advisor.SafeCall(
         LoadAddOn,
         "CoAAnalytics_DataProbe"
     )
     engine = Engine()
-    if engine and type(_G.CoAAnalyticsDB) == "table" then
-        _G.CoAAnalyticsDB.dataProbeLegacyMigrationComplete = true
-    end
     if not engine and announceError ~= false then
         Advisor.Print(
             "impossible de charger DataProbe. Vérifie que le dossier " ..
