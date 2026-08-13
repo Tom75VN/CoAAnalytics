@@ -1,12 +1,30 @@
 ## Interface: 30300
 ## Title: CoA Analytics
-## Notes: Analyse bilingue FR/EN des performances en BG, donjons et raids, avec suivi en temps reel.
+## Notes: Analyse des performances, conseils de personnage, butin et collecte pour Conquest of Azeroth.
 ## Author: OpenAI
-## Version: 2.16.6
+## Version: 2.17.0
 ## SavedVariables: CoAAnalyticsDB
 
 Namespace.lua
 Locale.lua
+Advisor\Utils.lua
+Advisor\Locale.lua
+Advisor\GuideProfiles.lua
+Advisor\ResearchProfiles.lua
+Advisor\Data.lua
+Advisor\CommunityData.lua
+Advisor\TalentEngine.lua
+Advisor\TooltipParser.lua
+Advisor\TalentScanner.lua
+Advisor\CharacterScanner.lua
+Advisor\CombatProfiler.lua
+Advisor\LocalAnalyzer.lua
+Advisor\DataProbeController.lua
+Advisor\StatModel.lua
+Advisor\ItemAdvisor.lua
+Advisor\TooltipHooks.lua
+Advisor\LootAdvisor.lua
+Advisor\ProcTracker.lua
 KeystoneBosses.lua
 Core.lua
 BGRanking.lua
@@ -18,3 +36,5 @@ UI.lua
 Minimap.lua
 Scoreboard.lua
 BGTimer.lua
+Advisor\Interface.lua
+Advisor\Core.lua

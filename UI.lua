@@ -51,7 +51,8 @@ local ui = {
 	playerSearchIndexDirty = true,
 	rankingRows = {},
 	playerRankingRows = {},
-	activeSettingsTab = "ranking",
+	activeSettingsTab = "home",
+	activePerformanceTab = "ranking",
 	activeSettingsMode = "general",
 	activeRankingCategory = "dps",
 	activeRankingMode = "specializations",
@@ -1489,20 +1490,36 @@ end
 local function SetSettingsSection(section)
 	if section == "nameplates" then
 		ui.activeSettingsMode = "nameplates"
-		ui.activeSettingsTab = "settings"
-	elseif section == "settings" or section == "pve" or section == "pvesession" then
-		ui.activeSettingsTab = section
-	else
-		ui.activeSettingsTab = "ranking"
+		section = "settings"
+	elseif section == "ranking" or section == "pve" or section == "pvesession" then
+		ui.activePerformanceTab = section
+		section = "performance"
+	elseif section ~= "home" and section ~= "performance"
+		and section ~= "advisor" and section ~= "loot"
+		and section ~= "combat" and section ~= "collection"
+		and section ~= "settings"
+	then
+		section = "home"
 	end
-	SetModernTabActive(ui.nameplateTabButton, ui.activeSettingsTab == "settings")
-	SetModernTabActive(ui.rankingTabButton, ui.activeSettingsTab == "ranking")
-	SetModernTabActive(ui.pveRankingTabButton, ui.activeSettingsTab == "pve")
-	SetModernTabActive(ui.pveSessionTabButton, ui.activeSettingsTab == "pvesession")
+	ui.activeSettingsTab = section
+	SetModernTabActive(ui.homeTabButton, section == "home")
+	SetModernTabActive(ui.performanceTabButton, section == "performance")
+	SetModernTabActive(ui.advisorTabButton, section == "advisor")
+	SetModernTabActive(ui.lootTabButton, section == "loot")
+	SetModernTabActive(ui.combatTabButton, section == "combat")
+	SetModernTabActive(ui.collectionTabButton, section == "collection")
+	SetModernTabActive(ui.nameplateTabButton, section == "settings")
+	SetModernTabActive(ui.rankingTabButton, ui.activePerformanceTab == "ranking")
+	SetModernTabActive(ui.pveRankingTabButton, ui.activePerformanceTab == "pve")
+	SetModernTabActive(ui.pveSessionTabButton, ui.activePerformanceTab == "pvesession")
 	-- Toujours repartir d'un etat exclusif. Si un module optionnel manque ou si
 	-- une creation precedente a ete interrompue, aucun panneau ne doit rester
 	-- superpose au panneau actif.
 	ui.nameplateSettingsPanel:Hide()
+	ui.dashboardPanel:Hide()
+	ui.performanceNavigationPanel:Hide()
+	ui.advisorHostPanel:Hide()
+	ui.combatPanel:Hide()
 	ui.rankingPanel:Hide()
 	if ui.pveRankingPanel then
 		ui.pveRankingPanel:Hide()
@@ -1510,24 +1527,41 @@ local function SetSettingsSection(section)
 	if ui.pveSessionPanel then
 		ui.pveSessionPanel:Hide()
 	end
-	if ui.activeSettingsTab == "ranking" then
-		ui.rankingPanel:Show()
-		SetRankingMode(ui.activeRankingMode)
-	elseif ui.activeSettingsTab == "pve" then
-		if ui.pveRankingPanel then
-			ui.pveRankingPanel:Show()
-			if CoAAnalyticsPvE and CoAAnalyticsPvE.RefreshPanel then
-				CoAAnalyticsPvE.RefreshPanel()
+	if section == "home" then
+		ui.dashboardPanel:Show()
+	elseif section == "performance" then
+		ui.performanceNavigationPanel:Show()
+		if ui.activePerformanceTab == "ranking" then
+			ui.rankingPanel:Show()
+			SetRankingMode(ui.activeRankingMode)
+		elseif ui.activePerformanceTab == "pve" then
+			if ui.pveRankingPanel then
+				ui.pveRankingPanel:Show()
+				if CoAAnalyticsPvE and CoAAnalyticsPvE.RefreshPanel then
+					CoAAnalyticsPvE.RefreshPanel()
+				end
 			end
-		end
-	elseif ui.activeSettingsTab == "pvesession" then
-		if ui.pveSessionPanel then
+		elseif ui.pveSessionPanel then
 			ui.pveSessionPanel:Show()
 			if CoAAnalyticsPvE and CoAAnalyticsPvE.RefreshSessionPanel then
 				CoAAnalyticsPvE.RefreshSessionPanel()
 			end
 		end
-	else
+	elseif section == "advisor" or section == "loot" or section == "collection" then
+		ui.advisorHostPanel:Show()
+		local advisorUI = CoAAnalyticsAddon.Advisor and CoAAnalyticsAddon.Advisor.UI
+		if advisorUI then
+			advisorUI.Attach(ui.advisorHostPanel)
+			advisorUI.SelectTab(
+				section == "loot" and "autoloot"
+				or section == "collection" and "dataprobe"
+				or "advisor"
+			)
+		end
+	elseif section == "combat" then
+		ui.combatPanel:Show()
+		if UI.RefreshCombatPanel then UI.RefreshCombatPanel() end
+	elseif section == "settings" then
 		ui.nameplateSettingsPanel:Show()
 		SetSettingsMode(ui.activeSettingsMode)
 	end
@@ -1546,8 +1580,8 @@ local function CreateSettingsFrame()
 	-- Un Frame nouvellement cree est visible par defaut. Le masquer tout de
 	-- suite evite une interface partielle si une API du client est absente.
 	frame:Hide()
-	frame:SetWidth(760)
-	frame:SetHeight(560)
+	frame:SetWidth(960)
+	frame:SetHeight(820)
 	frame:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
 	frame:SetFrameStrata("DIALOG")
 	frame:SetToplevel(true)
@@ -1589,21 +1623,152 @@ local function CreateSettingsFrame()
 	CreateLanguageFlagButton(frame, "en", -42)
 	RefreshLanguageButtons()
 
-	ui.rankingTabButton = CreateModernTab(frame, "Classement BG", 0.95, 0.61, 0.12)
-	ui.rankingTabButton:SetWidth(150)
-	ui.rankingTabButton:SetPoint("TOPLEFT", frame, "TOPLEFT", 22, -52)
-	ui.pveRankingTabButton = CreateModernTab(frame, "Classement PvE", 0.30, 0.62, 0.95)
-	ui.pveRankingTabButton:SetWidth(145)
+	local function CreateSidebarTab(label, y, r, g, b)
+		local button = CreateModernTab(frame, label, r, g, b)
+		button:SetWidth(142)
+		button:SetHeight(32)
+		button:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, y)
+		return button
+	end
+
+	ui.homeTabButton = CreateSidebarTab("Accueil", -58, 0.10, 0.72, 0.52)
+	ui.performanceTabButton = CreateSidebarTab("Performances", -98, 0.95, 0.61, 0.12)
+	ui.advisorTabButton = CreateSidebarTab("Conseils", -138, 1.00, 0.82, 0.20)
+	ui.lootTabButton = CreateSidebarTab("Butin", -178, 0.85, 0.48, 0.20)
+	ui.combatTabButton = CreateSidebarTab("Combat", -218, 0.86, 0.25, 0.28)
+	ui.collectionTabButton = CreateSidebarTab("Collecte", -258, 0.68, 0.43, 0.95)
+	ui.nameplateTabButton = CreateSidebarTab("Parametres", -298, 0.10, 0.72, 0.52)
+
+	local sidebarDivider = CreateSolidTexture(frame, "ARTWORK", 0.20, 0.22, 0.27, 1)
+	sidebarDivider:SetPoint("TOPLEFT", frame, "TOPLEFT", 169, -52)
+	sidebarDivider:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 169, 18)
+	sidebarDivider:SetWidth(1)
+
+	ui.performanceNavigationPanel = CreateFrame("Frame", nil, frame)
+	ui.performanceNavigationPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 184, -52)
+	ui.performanceNavigationPanel:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -18, -52)
+	ui.performanceNavigationPanel:SetHeight(34)
+	ui.performanceNavigationPanel:Hide()
+	ui.rankingTabButton = CreateModernTab(ui.performanceNavigationPanel, "BG", 0.95, 0.61, 0.12)
+	ui.rankingTabButton:SetWidth(140)
+	ui.rankingTabButton:SetPoint("TOPLEFT", ui.performanceNavigationPanel, "TOPLEFT", 0, 0)
+	ui.pveRankingTabButton = CreateModernTab(ui.performanceNavigationPanel, "Classement PvE", 0.30, 0.62, 0.95)
+	ui.pveRankingTabButton:SetWidth(155)
 	ui.pveRankingTabButton:SetPoint("LEFT", ui.rankingTabButton, "RIGHT", 8, 0)
-	ui.pveSessionTabButton = CreateModernTab(frame, "Performance PvE", 0.68, 0.43, 0.95)
+	ui.pveSessionTabButton = CreateModernTab(ui.performanceNavigationPanel, "Session PvE", 0.68, 0.43, 0.95)
 	ui.pveSessionTabButton:SetWidth(145)
 	ui.pveSessionTabButton:SetPoint("LEFT", ui.pveRankingTabButton, "RIGHT", 8, 0)
-	ui.nameplateTabButton = CreateModernTab(frame, "Settings", 0.10, 0.72, 0.52)
-	ui.nameplateTabButton:SetWidth(125)
-	ui.nameplateTabButton:SetPoint("LEFT", ui.pveSessionTabButton, "RIGHT", 8, 0)
+
+	ui.dashboardPanel = CreateFrame("Frame", nil, frame)
+	ui.dashboardPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 184, -58)
+	ui.dashboardPanel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -18, 18)
+	ui.dashboardPanel:Hide()
+	local dashboardTitle = ui.dashboardPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	dashboardTitle:SetPoint("TOPLEFT", ui.dashboardPanel, "TOPLEFT", 10, -8)
+	dashboardTitle:SetText("Vue d'ensemble")
+	local dashboardDescription = ui.dashboardPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	dashboardDescription:SetPoint("TOPLEFT", dashboardTitle, "BOTTOMLEFT", 0, -10)
+	dashboardDescription:SetWidth(700)
+	dashboardDescription:SetJustifyH("LEFT")
+	dashboardDescription:SetText(
+		"Un seul espace pour mesurer les performances, ameliorer le personnage, gerer le butin et contribuer aux donnees communautaires."
+	)
+	local dashboardItems = {
+		{ "Performances", "Classements BG, donjons, raids et session en cours.", "performance", 0.95, 0.61, 0.12 },
+		{ "Conseils", "Talents, priorites et comparaison d'equipement adaptes au personnage.", "advisor", 1.00, 0.82, 0.20 },
+		{ "Butin", "Compatibilite des objets et regles de jets automatiques.", "loot", 0.85, 0.48, 0.20 },
+		{ "Collecte", "DataProbe reste optionnel et charge uniquement a la demande.", "collection", 0.68, 0.43, 0.95 },
+	}
+	for index, item in ipairs(dashboardItems) do
+		local card = CreateFrame("Frame", nil, ui.dashboardPanel)
+		card:SetWidth(350)
+		card:SetHeight(150)
+		local column = (index - 1) % 2
+		local row = math.floor((index - 1) / 2)
+		card:SetPoint("TOPLEFT", ui.dashboardPanel, "TOPLEFT", 10 + column * 366, -82 - row * 168)
+		card:SetBackdrop({
+			bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+			tile = true, tileSize = 16, edgeSize = 10,
+			insets = { left = 3, right = 3, top = 3, bottom = 3 },
+		})
+		card:SetBackdropColor(0.05, 0.055, 0.07, 0.96)
+		card:SetBackdropBorderColor(item[4], item[5], item[6], 0.8)
+		local cardTitle = card:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+		cardTitle:SetPoint("TOPLEFT", card, "TOPLEFT", 16, -16)
+		cardTitle:SetText(item[1])
+		local cardText = card:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		cardText:SetPoint("TOPLEFT", cardTitle, "BOTTOMLEFT", 0, -10)
+		cardText:SetWidth(315)
+		cardText:SetHeight(48)
+		cardText:SetJustifyH("LEFT")
+		cardText:SetJustifyV("TOP")
+		cardText:SetWordWrap(true)
+		cardText:SetText(item[2])
+		local openButton = CreateModernTab(card, "Ouvrir", item[4], item[5], item[6])
+		openButton:SetWidth(110)
+		openButton:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 14)
+		local targetSection = item[3]
+		openButton:SetScript("OnClick", function() SetSettingsSection(targetSection) end)
+	end
+
+	ui.advisorHostPanel = CreateFrame("Frame", nil, frame)
+	ui.advisorHostPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 184, -52)
+	ui.advisorHostPanel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -18, 18)
+	ui.advisorHostPanel:Hide()
+
+	ui.combatPanel = CreateFrame("Frame", nil, frame)
+	ui.combatPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 184, -58)
+	ui.combatPanel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -18, 18)
+	ui.combatPanel:Hide()
+	local combatTitle = ui.combatPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	combatTitle:SetPoint("TOPLEFT", ui.combatPanel, "TOPLEFT", 10, -8)
+	combatTitle:SetText("Analyse de combat")
+	local combatIntro = ui.combatPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	combatIntro:SetPoint("TOPLEFT", combatTitle, "BOTTOMLEFT", 0, -12)
+	combatIntro:SetWidth(710)
+	combatIntro:SetJustifyH("LEFT")
+	combatIntro:SetText(
+		"Les deux collecteurs restent independants : les performances mesurent le groupe, tandis que les conseils calibrent uniquement ton personnage."
+	)
+	ui.combatPerformanceText = ui.combatPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	ui.combatPerformanceText:SetPoint("TOPLEFT", ui.combatPanel, "TOPLEFT", 24, -115)
+	ui.combatPerformanceText:SetWidth(680)
+	ui.combatPerformanceText:SetHeight(100)
+	ui.combatPerformanceText:SetJustifyH("LEFT")
+	ui.combatPerformanceText:SetJustifyV("TOP")
+	ui.combatAdvisorText = ui.combatPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	ui.combatAdvisorText:SetPoint("TOPLEFT", ui.combatPanel, "TOPLEFT", 24, -260)
+	ui.combatAdvisorText:SetWidth(680)
+	ui.combatAdvisorText:SetHeight(150)
+	ui.combatAdvisorText:SetJustifyH("LEFT")
+	ui.combatAdvisorText:SetJustifyV("TOP")
+	local openPerformanceButton = CreateModernTab(ui.combatPanel, "Voir les performances", 0.95, 0.61, 0.12)
+	openPerformanceButton:SetWidth(180)
+	openPerformanceButton:SetPoint("TOPLEFT", ui.combatPanel, "TOPLEFT", 24, -205)
+	openPerformanceButton:SetScript("OnClick", function() SetSettingsSection("performance") end)
+	ui.toggleLocalAnalysisButton = CreateModernTab(ui.combatPanel, "Analyse locale", 0.10, 0.72, 0.52)
+	ui.toggleLocalAnalysisButton:SetWidth(170)
+	ui.toggleLocalAnalysisButton:SetPoint("TOPLEFT", ui.combatPanel, "TOPLEFT", 24, -430)
+	ui.toggleLocalAnalysisButton:SetScript("OnClick", function()
+		local advisor = CoAAnalyticsAddon.Advisor
+		if advisor and advisor.LocalAnalyzer then
+			advisor.LocalAnalyzer.SetEnabled(not advisor.LocalAnalyzer.IsEnabled())
+			UI.RefreshCombatPanel()
+		end
+	end)
+	local resetCombatButton = CreateModernTab(ui.combatPanel, "Effacer l'historique", 0.86, 0.25, 0.28)
+	resetCombatButton:SetWidth(170)
+	resetCombatButton:SetPoint("LEFT", ui.toggleLocalAnalysisButton, "RIGHT", 10, 0)
+	resetCombatButton:SetScript("OnClick", function()
+		local advisor = CoAAnalyticsAddon.Advisor
+		if advisor and advisor.LocalAnalyzer then advisor.LocalAnalyzer.Reset() end
+		if advisor and advisor.CombatProfiler then advisor.CombatProfiler.Reset() end
+		UI.RefreshCombatPanel()
+	end)
 
 	ui.nameplateSettingsPanel = CreateFrame("Frame", nil, frame)
-	ui.nameplateSettingsPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -88)
+	ui.nameplateSettingsPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 184, -52)
 	ui.nameplateSettingsPanel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -18, 18)
 	ui.nameplateSettingsPanel:Hide()
 
@@ -1991,7 +2156,7 @@ local function CreateSettingsFrame()
 	)
 
 	ui.rankingPanel = CreateFrame("Frame", nil, frame)
-	ui.rankingPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -88)
+	ui.rankingPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 184, -96)
 	ui.rankingPanel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -18, 18)
 	ui.rankingPanel:Hide()
 
@@ -2498,13 +2663,37 @@ local function CreateSettingsFrame()
 
 	if CoAAnalyticsPvE and CoAAnalyticsPvE.CreatePanel then
 		ui.pveRankingPanel = CoAAnalyticsPvE.CreatePanel(frame)
+		ui.pveRankingPanel:ClearAllPoints()
+		ui.pveRankingPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 184, -96)
+		ui.pveRankingPanel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -18, 18)
 	end
 	if CoAAnalyticsPvE and CoAAnalyticsPvE.CreateSessionPanel then
 		ui.pveSessionPanel = CoAAnalyticsPvE.CreateSessionPanel(frame)
+		ui.pveSessionPanel:ClearAllPoints()
+		ui.pveSessionPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 184, -96)
+		ui.pveSessionPanel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -18, 18)
 	end
 
 	ui.nameplateTabButton:SetScript("OnClick", function()
 		SetSettingsSection("settings")
+	end)
+	ui.homeTabButton:SetScript("OnClick", function()
+		SetSettingsSection("home")
+	end)
+	ui.performanceTabButton:SetScript("OnClick", function()
+		SetSettingsSection("performance")
+	end)
+	ui.advisorTabButton:SetScript("OnClick", function()
+		SetSettingsSection("advisor")
+	end)
+	ui.lootTabButton:SetScript("OnClick", function()
+		SetSettingsSection("loot")
+	end)
+	ui.combatTabButton:SetScript("OnClick", function()
+		SetSettingsSection("combat")
+	end)
+	ui.collectionTabButton:SetScript("OnClick", function()
+		SetSettingsSection("collection")
 	end)
 	ui.generalSettingsTabButton:SetScript("OnClick", function()
 		SetSettingsMode("general")
@@ -2513,13 +2702,16 @@ local function CreateSettingsFrame()
 		SetSettingsMode("nameplates")
 	end)
 	ui.rankingTabButton:SetScript("OnClick", function()
-		SetSettingsSection("ranking")
+		ui.activePerformanceTab = "ranking"
+		SetSettingsSection("performance")
 	end)
 	ui.pveRankingTabButton:SetScript("OnClick", function()
-		SetSettingsSection("pve")
+		ui.activePerformanceTab = "pve"
+		SetSettingsSection("performance")
 	end)
 	ui.pveSessionTabButton:SetScript("OnClick", function()
-		SetSettingsSection("pvesession")
+		ui.activePerformanceTab = "pvesession"
+		SetSettingsSection("performance")
 	end)
 	ui.specializationRankingTabButton:SetScript("OnClick", function()
 		SetRankingMode("specializations")
@@ -2565,12 +2757,51 @@ local function CreateSettingsFrame()
 	return frame
 end
 
-local function ToggleSettingsFrame()
+function UI.RefreshCombatPanel()
+	if not ui.combatPerformanceText then return end
+	local snapshot = CoAAnalyticsPvE and CoAAnalyticsPvE.GetCurrentDungeonSnapshot
+		and CoAAnalyticsPvE.GetCurrentDungeonSnapshot()
+	local dungeonState = snapshot and snapshot.active
+		and ("Session de donjon active : " .. tostring(snapshot.instanceName or "Donjon"))
+		or "Aucune session de donjon active."
+	ui.combatPerformanceText:SetText(
+		"|cffffb347Collecteur de performances|r\n"
+			.. "Mesure le groupe en BG, donjon et raid pour les classements et les notes. "
+			.. dungeonState
+	)
+
+	local advisor = CoAAnalyticsAddon.Advisor
+	local analyzer = advisor and advisor.LocalAnalyzer
+	local profiler = advisor and advisor.CombatProfiler
+	local summary = analyzer and analyzer.GetSummary and analyzer.GetSummary()
+	local profile = profiler and profiler.GetProfile and profiler.GetProfile()
+	local enabled = analyzer and analyzer.IsEnabled and analyzer.IsEnabled()
+	local fights = summary and summary.fights or profile and profile.fights or 0
+	local deaths = summary and summary.deaths or 0
+	local mode = summary and summary.dominantModeLabel or "inconnu"
+	ui.combatAdvisorText:SetText(
+		"|cff66ccffCollecteur de conseils|r\n"
+			.. "Calibre les recommandations du personnage sans reutiliser les scores du groupe.\n\n"
+			.. "Analyse locale : " .. (enabled and "active" or "inactive")
+			.. " | Combats : " .. tostring(fights)
+			.. " | Morts : " .. tostring(deaths)
+			.. " | Contexte dominant : " .. tostring(mode)
+			.. (summary and summary.reason and ("\n" .. summary.reason) or "")
+	)
+	if ui.toggleLocalAnalysisButton and ui.toggleLocalAnalysisButton.text then
+		ui.toggleLocalAnalysisButton.text:SetText(
+			enabled and "Analyse locale : ON" or "Analyse locale : OFF"
+		)
+	end
+end
+
+local function ToggleSettingsFrame(section)
 	local frame = CreateSettingsFrame()
 	if frame:IsShown() then
 		frame:Hide()
 	else
-		ui.activeSettingsTab = "ranking"
+		if section then ui.activeSettingsTab = section end
+		if not ui.activeSettingsTab then ui.activeSettingsTab = "home" end
 		frame:Show()
 	end
 end
@@ -2600,23 +2831,15 @@ function UI.Open(section, rankingMode)
 	if rankingMode == "players" or rankingMode == "specializations" then
 		ui.activeRankingMode = rankingMode
 	end
-	if section == "nameplates" then
-		ui.activeSettingsMode = "nameplates"
-		ui.activeSettingsTab = "settings"
-	elseif section == "settings" or section == "pve" or section == "pvesession" then
-		ui.activeSettingsTab = section
-	else
-		ui.activeSettingsTab = "ranking"
-	end
 	local frame = CreateSettingsFrame()
+	SetSettingsSection(section or "home")
 	frame:Show()
-	SetSettingsSection(ui.activeSettingsTab)
 end
 
-function UI.Toggle()
+function UI.Toggle(section)
 	addonDB = API and API.GetDatabase and API.GetDatabase() or addonDB
 	if addonDB then
-		ToggleSettingsFrame()
+		ToggleSettingsFrame(section)
 	end
 end
 

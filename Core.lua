@@ -1,5 +1,5 @@
 local ADDON_NAME = ...
-local ADDON_VERSION = CoAAnalyticsAddon and CoAAnalyticsAddon.VERSION or "2.16.6"
+local ADDON_VERSION = CoAAnalyticsAddon and CoAAnalyticsAddon.VERSION or "2.17.0"
 
 local ICON_SIZE = 18
 local ICON_OFFSET_Y = 3
@@ -744,6 +744,9 @@ local function InitializeDatabase()
 		CoAAnalyticsDB = {}
 	end
 	addonDB = CoAAnalyticsDB
+	if not addonDB.advisorLegacyMigrationComplete and type(LoadAddOn) == "function" then
+		pcall(LoadAddOn, "CoAAdvisor")
+	end
 	if addonDB.language ~= "fr" and addonDB.language ~= "en" then
 		addonDB.language = "fr"
 	end
@@ -1489,8 +1492,23 @@ SlashCmdList.COAANALYTICS = function(message)
 	message = message:gsub("^%s+", ""):gsub("%s+$", "")
 	local requestedLanguage = message:match("^language%s+(%a%a)$")
 		or message:match("^langue%s+(%a%a)$")
+	local advisorCommand = message:match("^advisor%s*(.*)$")
 
-	if requestedLanguage then
+	if message == "" or message == "ui" or message == "show" or message == "home" then
+		if CoAAnalyticsAddon.Modules.UI then CoAAnalyticsAddon.Modules.UI.Open("home") end
+	elseif advisorCommand ~= nil then
+		if advisorCommand == "" then
+			if CoAAnalyticsAddon.Modules.UI then CoAAnalyticsAddon.Modules.UI.Open("advisor") end
+		elseif CoAAnalyticsAddon.Advisor and CoAAnalyticsAddon.Advisor.HandleCommand then
+			CoAAnalyticsAddon.Advisor.HandleCommand(advisorCommand)
+		end
+	elseif message == "loot" or message == "butin" then
+		if CoAAnalyticsAddon.Modules.UI then CoAAnalyticsAddon.Modules.UI.Open("loot") end
+	elseif message == "combat" then
+		if CoAAnalyticsAddon.Modules.UI then CoAAnalyticsAddon.Modules.UI.Open("combat") end
+	elseif message == "collection" or message == "probe" or message == "dataprobe" then
+		if CoAAnalyticsAddon.Modules.UI then CoAAnalyticsAddon.Modules.UI.Open("collection") end
+	elseif requestedLanguage then
 		if not CoAAnalyticsAPI.SetLanguage(requestedLanguage, true) then
 			Chat("Langues disponibles : Francais (fr), Anglais (en).")
 		end
@@ -1509,9 +1527,9 @@ SlashCmdList.COAANALYTICS = function(message)
 		if CoAAnalyticsAddon.Modules.UI then CoAAnalyticsAddon.Modules.UI.Open("ranking", "players") end
 	elseif message == "pve" or message == "classement pve" then
 		if CoAAnalyticsAddon.Modules.UI then CoAAnalyticsAddon.Modules.UI.Open("pve") end
-	elseif message == "performance" or message == "performance pve"
-		or message == "pve performance"
-	then
+	elseif message == "performance" or message == "performances" then
+		if CoAAnalyticsAddon.Modules.UI then CoAAnalyticsAddon.Modules.UI.Open("performance") end
+	elseif message == "performance pve" or message == "pve performance" then
 		if CoAAnalyticsAddon.Modules.UI then CoAAnalyticsAddon.Modules.UI.Open("pvesession") end
 	elseif message == "boss" or message == "keystone boss" then
 		local module = CoAAnalyticsAddon.Modules.KeystoneBosses
@@ -1569,7 +1587,7 @@ SlashCmdList.COAANALYTICS = function(message)
 				.. (state.pendingInspect and ", inspecting 1" or "")
 		)
 	else
-		Chat("/coaa settings | classement | joueurs | pve | performance | boss | boss share | pve log on|off|status|clear | pve status | language fr|en | log | status | debug | retry")
+		Chat("/coaa | performance | advisor | loot | combat | collection | settings | boss | boss share | pve log on|off|status|clear | language fr|en | log | status | debug | retry")
 	end
 end
 

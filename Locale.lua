@@ -5,6 +5,46 @@ local API = CoAAnalyticsAPI
 -- les modules de calcul; cette table traduit uniquement ce qui est affiche.
 local ENGLISH = {
 	["Settings"] = "Settings",
+	["Accueil"] = "Home",
+	["Performances"] = "Performance",
+	["Conseils"] = "Advice",
+	["Butin"] = "Loot",
+	["Combat"] = "Combat",
+	["Collecte"] = "Collection",
+	["Parametres"] = "Settings",
+	["BG"] = "Battlegrounds",
+	["Session PvE"] = "PvE Session",
+	["Vue d'ensemble"] = "Overview",
+	["Ouvrir"] = "Open",
+	["Analyse de combat"] = "Combat Analysis",
+	["Voir les performances"] = "View Performance",
+	["Analyse locale"] = "Local Analysis",
+	["Analyse locale : ON"] = "Local Analysis: ON",
+	["Analyse locale : OFF"] = "Local Analysis: OFF",
+	["Effacer l'historique"] = "Clear History",
+	["Un seul espace pour mesurer les performances, ameliorer le personnage, gerer le butin et contribuer aux donnees communautaires."] =
+		"One place to measure performance, improve your character, manage loot, and contribute community data.",
+	["Classements BG, donjons, raids et session en cours."] =
+		"Battleground, dungeon, raid, and current-session rankings.",
+	["Talents, priorites et comparaison d'equipement adaptes au personnage."] =
+		"Character-aware talents, priorities, and equipment comparisons.",
+	["Compatibilite des objets et regles de jets automatiques."] =
+		"Item compatibility and automatic loot-roll rules.",
+	["DataProbe reste optionnel et charge uniquement a la demande."] =
+		"DataProbe remains optional and loads only when requested.",
+	["Les deux collecteurs restent independants : les performances mesurent le groupe, tandis que les conseils calibrent uniquement ton personnage."] =
+		"The two collectors remain independent: performance measures the group, while advice calibrates only your character.",
+	["Collecteur de performances"] = "Performance Collector",
+	["Collecteur de conseils"] = "Advice Collector",
+	["Mesure le groupe en BG, donjon et raid pour les classements et les notes. "] =
+		"Measures the group in battlegrounds, dungeons, and raids for rankings and ratings. ",
+	["Calibre les recommandations du personnage sans reutiliser les scores du groupe."] =
+		"Calibrates character recommendations without reusing group scores.",
+	["Aucune session de donjon active."] = "No active dungeon session.",
+	["Session de donjon active : "] = "Active dungeon session: ",
+	["Analyse locale : "] = "Local analysis: ",
+	["Combats : "] = "Fights: ",
+	["Contexte dominant : "] = "Dominant context: ",
 	["General"] = "General",
 	["Nameplates"] = "Nameplates",
 	["Classement BG"] = "BG Rankings",

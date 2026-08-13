@@ -1,6 +1,6 @@
 # CoA Analytics
 
-A performance analysis addon for World of Warcraft: Ascension.
+A unified performance analysis and character-advice addon for World of Warcraft: Ascension.
 
 ## Features
 
@@ -10,6 +10,10 @@ A performance analysis addon for World of Warcraft: Ascension.
 - Mythic 0 Keystone boss identification, required boss-order drawer, and English party sharing
 - Pet, guardian, healing, threat, and utility tracking
 - Per-death spell, aura, exact-threat, and aggro diagnostics for every role
+- Class-aware talent, stat, equipment, tooltip, and loot recommendations
+- Local character-only combat calibration, kept separate from group performance collection
+- Optional community DataProbe, distributed as the load-on-demand `CoAAnalytics_DataProbe` addon
+- One interface organized into Home, Performance, Advice, Loot, Combat, Collection, and Settings
 - English and French interface
 
 In a recognized Mythic 0 dungeon, the live performance widget shows the
@@ -21,6 +25,11 @@ legacy routes that still need public CoA confirmation. The share button (or
 
 1. [Download the repository as a ZIP](https://github.com/Tom75VN/CoAAnalytics/archive/refs/heads/main.zip).
 2. Extract it and rename the folder to `CoAAnalytics`.
-3. Move it into `Interface/AddOns` and restart the game.
+3. Move `CoAAnalytics` into `Interface/AddOns`.
+4. Optionally move `CoAAnalytics_DataProbe` beside it to enable community data collection.
+5. Restart the game.
+
+Use `/coaa` to open the unified home page. Advisor commands are available
+under `/coaa advisor`, and DataProbe opens with `/coaa collection`.
 
 Player data and diagnostic logs remain local in the game's `WTF` folder.
