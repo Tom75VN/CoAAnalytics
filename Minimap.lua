@@ -5,6 +5,7 @@ CoAAnalyticsAddon.Modules.Minimap = MinimapModule
 
 local config = API and API.Config or {}
 local MINIMAP_BUTTON_RADIUS = config.MINIMAP_BUTTON_RADIUS or 80
+local BUTTON_BORDER_OVERHANG = 10
 local ROLE_FALLBACK_TEXTURES = config.ROLE_FALLBACK_TEXTURES or {}
 local addonDB
 local minimapButton
@@ -24,59 +25,53 @@ local function Atan2(y, x)
 	return 0
 end
 
-local function NormalizeAngle(angle)
-	angle = (tonumber(angle) or 0) % 360
-	if angle < 0 then
-		angle = angle + 360
-	end
-	return angle
-end
-
-local function GetAngularDistance(left, right)
-	local distance = math.abs(NormalizeAngle(left) - NormalizeAngle(right))
-	if distance > 180 then
-		distance = 360 - distance
-	end
-	return distance
-end
-
-local function AvoidMiniButtonCollision()
-	-- CoAMiniButton et CoA Analytics utilisaient historiquement le meme angle
-	-- et le meme rayon. Son launcher, plus haut dans la pile d'affichage,
-	-- recouvrait donc parfaitement notre unique bouton sans le collecter.
-	local collectorDB = _G.CoAMiniButtonDB
-	if type(collectorDB) ~= "table" then
-		return
-	end
-
-	local collectorAngle = tonumber(collectorDB.angle)
-	local collectorRadius = tonumber(collectorDB.radius)
-	if not collectorAngle or not collectorRadius then
-		return
-	end
-
-	local currentAngle = tonumber(addonDB.minimapButtonAngle) or 225
-	local sameRing = math.abs(collectorRadius - MINIMAP_BUTTON_RADIUS) < 36
-	if sameRing and GetAngularDistance(currentAngle, collectorAngle) < 28 then
-		-- Decaler vers la gauche de la minimap laisse les deux launchers
-		-- accessibles. La nouvelle position est sauvegardee et reste draggable.
-		addonDB.minimapButtonAngle = NormalizeAngle(collectorAngle - 45)
-	end
-end
-
 local function SetMinimapButtonPosition()
 	if not minimapButton or not addonDB then
 		return
 	end
 
 	local angle = math.rad(addonDB.minimapButtonAngle or 225)
+	local cosine = math.cos(angle)
+	local sine = math.sin(angle)
+	local offsetX = cosine * MINIMAP_BUTTON_RADIUS
+	local offsetY = sine * MINIMAP_BUTTON_RADIUS
+
+	-- ElvUI expose une minimap carree. L'angle sauvegarde reste identique,
+	-- mais il est projete sur le bord du carre au lieu d'un cercle invisible.
+	-- Cette conversion ne modifie jamais la position enregistree.
+	if type(GetMinimapShape) == "function" and
+		GetMinimapShape() == "SQUARE" then
+		local horizontalRadius =
+			(tonumber(Minimap:GetWidth()) or 0) / 2 + BUTTON_BORDER_OVERHANG
+		local verticalRadius =
+			(tonumber(Minimap:GetHeight()) or 0) / 2 + BUTTON_BORDER_OVERHANG
+		local horizontalScale
+		local verticalScale
+
+		if horizontalRadius > 0 and math.abs(cosine) > 0.0001 then
+			horizontalScale = horizontalRadius / math.abs(cosine)
+		end
+		if verticalRadius > 0 and math.abs(sine) > 0.0001 then
+			verticalScale = verticalRadius / math.abs(sine)
+		end
+
+		local edgeScale = horizontalScale or verticalScale
+		if verticalScale and (not edgeScale or verticalScale < edgeScale) then
+			edgeScale = verticalScale
+		end
+		if edgeScale then
+			offsetX = cosine * edgeScale
+			offsetY = sine * edgeScale
+		end
+	end
+
 	minimapButton:ClearAllPoints()
 	minimapButton:SetPoint(
 		"CENTER",
 		Minimap,
 		"CENTER",
-		math.cos(angle) * MINIMAP_BUTTON_RADIUS,
-		math.sin(angle) * MINIMAP_BUTTON_RADIUS
+		offsetX,
+		offsetY
 	)
 end
 
@@ -164,6 +159,7 @@ local function CreateMinimapButton()
 	end)
 
 	minimapButton = button
+	Minimap:HookScript("OnSizeChanged", SetMinimapButtonPosition)
 	SetMinimapButtonPosition()
 	button:Show()
 end
@@ -173,7 +169,6 @@ function MinimapModule.Initialize()
 	if not addonDB then
 		return false
 	end
-	AvoidMiniButtonCollision()
 	CreateMinimapButton()
 	return minimapButton ~= nil
 end

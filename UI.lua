@@ -18,7 +18,7 @@ CoAAnalyticsAddon.Modules.UI = UI
 
 local config = API and API.Config or {}
 local ADDON_VERSION = API and API.VERSION or "?"
-local RANKING_VISIBLE_ROWS = config.RANKING_VISIBLE_ROWS or 7
+local RANKING_MAX_VISIBLE_ROWS = config.RANKING_MAX_VISIBLE_ROWS or 20
 local RANKING_ROW_HEIGHT = config.RANKING_ROW_HEIGHT or 33
 local RANKING_TABLE_LEFT_INSET = config.RANKING_TABLE_LEFT_INSET or 12
 local RANKING_TABLE_RIGHT_INSET = config.RANKING_TABLE_RIGHT_INSET or 24
@@ -59,6 +59,14 @@ local ui = {
 	activePlayerRankingCategory = "dps",
 	activePlayerDpsFilter = "all",
 }
+
+local function GetVisibleRowCount(scrollFrame, rowHeight, maximum)
+	local height = scrollFrame and tonumber(scrollFrame:GetHeight()) or 0
+	if height <= 0 then
+		return math.min(7, maximum)
+	end
+	return math.max(1, math.min(maximum, math.floor(height / rowHeight)))
+end
 
 local function FormatLocalDiagnosticDateTime(timestamp)
 	timestamp = tonumber(timestamp)
@@ -680,20 +688,25 @@ local function RefreshSpecializationRankingPanel()
 		))
 	end
 
+	local visibleRows = GetVisibleRowCount(
+		ui.rankingScrollFrame,
+		RANKING_ROW_HEIGHT,
+		RANKING_MAX_VISIBLE_ROWS
+	)
 	FauxScrollFrame_Update(
 		ui.rankingScrollFrame,
 		#entries,
-		RANKING_VISIBLE_ROWS,
+		visibleRows,
 		RANKING_ROW_HEIGHT
 	)
 	local offset = FauxScrollFrame_GetOffset(ui.rankingScrollFrame) or 0
 	local leadingScore = entries[1]
 		and (tonumber(entries[1].score) or 0)
 		or 0
-	for rowIndex = 1, RANKING_VISIBLE_ROWS do
+	for rowIndex = 1, RANKING_MAX_VISIBLE_ROWS do
 		local row = ui.rankingRows[rowIndex]
 		local rankingIndex = offset + rowIndex
-		local result = entries[rankingIndex]
+		local result = rowIndex <= visibleRows and entries[rankingIndex]
 		local entry = result and result.entry
 		if row and entry then
 			local score = tonumber(result.score) or 0
@@ -1349,17 +1362,22 @@ ui.RefreshPlayerRankingPanel = function()
 		"Rang officiel apres 3 BG valides. Les arrivees en cours de partie sont corrigees au temps joue et pesent moins dans l'historique ; moins de 25% de presence ou une activite principale nulle sont ignores."
 	)
 
+	local visibleRows = GetVisibleRowCount(
+		ui.playerRankingScrollFrame,
+		RANKING_ROW_HEIGHT,
+		RANKING_MAX_VISIBLE_ROWS
+	)
 	FauxScrollFrame_Update(
 		ui.playerRankingScrollFrame,
 		#entries,
-		RANKING_VISIBLE_ROWS,
+		visibleRows,
 		RANKING_ROW_HEIGHT
 	)
 	local offset = FauxScrollFrame_GetOffset(ui.playerRankingScrollFrame) or 0
-	for rowIndex = 1, RANKING_VISIBLE_ROWS do
+	for rowIndex = 1, RANKING_MAX_VISIBLE_ROWS do
 		local row = ui.playerRankingRows[rowIndex]
 		local rankingIndex = offset + rowIndex
-		local entry = entries[rankingIndex]
+		local entry = rowIndex <= visibleRows and entries[rankingIndex]
 		if entry then
 			row.entry = entry
 			row.specButton.entry = entry
@@ -2301,7 +2319,7 @@ local function CreateSettingsFrame()
 			ui.RefreshRankingPanel
 		)
 	end)
-	for index = 1, RANKING_VISIBLE_ROWS do
+	for index = 1, RANKING_MAX_VISIBLE_ROWS do
 		ui.rankingRows[index] = CreateRankingRow(ui.specializationRankingPanel, index)
 	end
 
@@ -2576,7 +2594,7 @@ local function CreateSettingsFrame()
 			ui.RefreshPlayerRankingPanel
 		)
 	end)
-	for index = 1, RANKING_VISIBLE_ROWS do
+	for index = 1, RANKING_MAX_VISIBLE_ROWS do
 		ui.playerRankingRows[index] = CreatePlayerRankingRow(ui.playerRankingPanel, index)
 	end
 	ui.playerRankingNoDataText = ui.playerRankingPanel:CreateFontString(nil, "OVERLAY", "GameFontDisable")

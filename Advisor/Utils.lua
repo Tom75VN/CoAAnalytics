@@ -18,7 +18,7 @@ end
 _G.CoAAnalyticsAdvisorDB = _G.CoAAnalyticsDB.advisor
 
 Advisor.name = "CoAAnalytics"
-Advisor.version = Addon.VERSION or "2.17.0"
+Advisor.version = Addon.VERSION or "2.17.3"
 Advisor.interface = 30300
 
 function Advisor.GetDatabase()

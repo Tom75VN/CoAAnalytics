@@ -3,12 +3,20 @@ local PvE = CoAAnalyticsPvE
 local CreateFrame = API.CreateLocalizedFrame
 local GameTooltip = API.CreateLocalizedTooltipProxy(GameTooltip)
 
-local VISIBLE_ROWS = 7
+local MAX_VISIBLE_ROWS = 20
 local ROW_HEIGHT = 34
-local SESSION_VISIBLE_ROWS = 7
+local SESSION_MAX_VISIBLE_ROWS = 20
 local SESSION_ROW_HEIGHT = 34
 local RANKING_PROGRESS_ALPHA = 0.38
 local SESSION_PROGRESS_ALPHA = 0.36
+
+local function GetVisibleRowCount(frame, rowHeight, maximum)
+	local height = frame and tonumber(frame:GetHeight()) or 0
+	if height <= 0 then
+		return math.min(7, maximum)
+	end
+	return math.max(1, math.min(maximum, math.floor(height / rowHeight)))
+end
 local TABLE_LEFT_INSET = 12
 local TABLE_RIGHT_INSET = 27
 local RANKING_COLUMNS = {
@@ -246,13 +254,14 @@ function PvE.RefreshPanel()
 			.. " / " .. scopeLabels[activeScope] .. "."
 	)
 
-	FauxScrollFrame_Update(scrollFrame, #entries, VISIBLE_ROWS, ROW_HEIGHT)
+	local visibleRows = GetVisibleRowCount(scrollFrame, ROW_HEIGHT, MAX_VISIBLE_ROWS)
+	FauxScrollFrame_Update(scrollFrame, #entries, visibleRows, ROW_HEIGHT)
 	local offset = FauxScrollFrame_GetOffset(scrollFrame) or 0
 	local leader = entries[1] and entries[1].score or 100
-	for index = 1, VISIBLE_ROWS do
+	for index = 1, MAX_VISIBLE_ROWS do
 		local row = rows[index]
 		local rankingIndex = offset + index
-		local entry = entries[rankingIndex]
+		local entry = index <= visibleRows and entries[rankingIndex]
 		if entry then
 			row.entry = entry
 			row.rank:SetText(tostring(rankingIndex))
@@ -418,7 +427,7 @@ function PvE.CreatePanel(parent)
 	scrollFrame:SetScript("OnVerticalScroll", function(self, offset)
 		FauxScrollFrame_OnVerticalScroll(self, offset, ROW_HEIGHT, PvE.RefreshPanel)
 	end)
-	for index = 1, VISIBLE_ROWS do
+	for index = 1, MAX_VISIBLE_ROWS do
 		rows[index] = CreateRow(panel, index)
 	end
 
@@ -777,16 +786,21 @@ function PvE.RefreshSessionPanel()
 		sessionStatusText:SetTextColor(0.62, 0.65, 0.72)
 	end
 
+	local visibleRows = GetVisibleRowCount(
+		sessionScrollFrame,
+		SESSION_ROW_HEIGHT,
+		SESSION_MAX_VISIBLE_ROWS
+	)
 	FauxScrollFrame_Update(
 		sessionScrollFrame,
 		#entries,
-		SESSION_VISIBLE_ROWS,
+		visibleRows,
 		SESSION_ROW_HEIGHT
 	)
 	local offset = FauxScrollFrame_GetOffset(sessionScrollFrame) or 0
-	for index = 1, SESSION_VISIBLE_ROWS do
+	for index = 1, SESSION_MAX_VISIBLE_ROWS do
 		local row = sessionRows[index]
-		local entry = entries[offset + index]
+		local entry = index <= visibleRows and entries[offset + index]
 		if entry then
 			row.entry = entry
 			if API and API.ApplySpecializationTexture then
@@ -935,7 +949,7 @@ function PvE.CreateSessionPanel(parent)
 			PvE.RefreshSessionPanel
 		)
 	end)
-	for index = 1, SESSION_VISIBLE_ROWS do
+	for index = 1, SESSION_MAX_VISIBLE_ROWS do
 		sessionRows[index] = CreateSessionRow(sessionPanel, index)
 	end
 
