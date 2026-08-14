@@ -2,7 +2,7 @@
 ## Title: CoA Analytics
 ## Notes: Analyse des performances, conseils de personnage, butin et collecte pour Conquest of Azeroth.
 ## Author: OpenAI
-## Version: 3.1.0
+## Version: 3.1.1
 ## SavedVariables: CoAAnalyticsDB
 
 Namespace.lua

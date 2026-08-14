@@ -34,7 +34,7 @@ end
 BindAdvisorDatabase()
 
 Advisor.name = "CoAAnalytics"
-Advisor.version = Addon.VERSION or "3.1.0"
+Advisor.version = Addon.VERSION or "3.1.1"
 Advisor.interface = 30300
 
 function Advisor.GetDatabase()

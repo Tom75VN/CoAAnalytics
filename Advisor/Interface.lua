@@ -2400,7 +2400,7 @@ local function Build(parent)
     title:SetTextColor(1, 0.82, 0.2)
     local version = mainFrame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     version:SetPoint("LEFT", title, "RIGHT", 8, -1)
-    version:SetText("v" .. tostring(Advisor.version or "3.1.0"))
+    version:SetText("v" .. tostring(Advisor.version or "3.1.1"))
     local subtitle = CreateText(
         mainFrame, "GameFontDisableSmall",
         "Recommandations de classe et collecte communautaire DataProbe",

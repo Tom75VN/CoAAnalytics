@@ -5,6 +5,7 @@ CoAAnalyticsAddon.Modules.RaidMinimap = RaidMinimap
 local UPDATE_INTERVAL = 0.12
 local MAP_REFRESH_INTERVAL = 2
 local POSITION_GRACE_SECONDS = 1.5
+local SETTINGS_SCHEMA_VERSION = 1
 local FALLBACK_MAP_WIDTH = 1500
 local FLAG_MARKER_SIZE = 24
 local MARKER_TEXTURE =
@@ -119,7 +120,13 @@ local function EnsureSettings()
 	end
 	settings = addonDB.raidMinimap
 
-	if settings.enabled == nil then
+	local schemaVersion = tonumber(settings.schemaVersion) or 0
+	if schemaVersion < SETTINGS_SCHEMA_VERSION then
+		-- Version 3.1.1 enables the newly integrated feature once for every
+		-- existing installation. Later user changes remain persistent.
+		settings.enabled = true
+		settings.schemaVersion = SETTINGS_SCHEMA_VERSION
+	elseif settings.enabled == nil then
 		settings.enabled = true
 	end
 	settings.size = ClampSize(settings.size)
