@@ -1,5 +1,5 @@
 local ADDON_NAME = ...
-local ADDON_VERSION = CoAAnalyticsAddon and CoAAnalyticsAddon.VERSION or "3.0.0"
+local ADDON_VERSION = CoAAnalyticsAddon and CoAAnalyticsAddon.VERSION or "3.1.0"
 
 local ICON_SIZE = 18
 local ICON_OFFSET_Y = 3
@@ -1274,6 +1274,11 @@ driver:SetScript("OnEvent", function(_, event, value)
 		driver:UnregisterEvent("INSPECT_CHARACTER_ADVANCEMENT_RESULT")
 	elseif event == "PLAYER_LOGIN" then
 		InitializeDatabase()
+		if CoAAnalyticsAddon.Modules.RaidMinimap
+			and CoAAnalyticsAddon.Modules.RaidMinimap.Initialize
+		then
+			CoAAnalyticsAddon.Modules.RaidMinimap.Initialize()
+		end
 		if CoAAnalyticsAddon.Modules.Nameplates and CoAAnalyticsAddon.Modules.Nameplates.Initialize then
 			CoAAnalyticsAddon.Modules.Nameplates.Initialize()
 		end
@@ -1495,9 +1500,16 @@ SlashCmdList.COAANALYTICS = function(message)
 	local requestedLanguage = message:match("^language%s+(%a%a)$")
 		or message:match("^langue%s+(%a%a)$")
 	local advisorCommand = message:match("^advisor%s*(.*)$")
+	local raidMinimapCommand = message:match("^minimap%s*(.*)$")
+		or message:match("^raidminimap%s*(.*)$")
 
 	if message == "" or message == "ui" or message == "show" or message == "home" then
 		if CoAAnalyticsAddon.Modules.UI then CoAAnalyticsAddon.Modules.UI.Open("home") end
+	elseif raidMinimapCommand ~= nil then
+		local module = CoAAnalyticsAddon.Modules.RaidMinimap
+		if module and module.HandleCommand then
+			module.HandleCommand(raidMinimapCommand)
+		end
 	elseif advisorCommand ~= nil then
 		if advisorCommand == "" then
 			if CoAAnalyticsAddon.Modules.UI then CoAAnalyticsAddon.Modules.UI.Open("advisor") end
@@ -1603,7 +1615,7 @@ SlashCmdList.COAANALYTICS = function(message)
 				.. (state.pendingInspect and ", inspecting 1" or "")
 		)
 	else
-		Chat("/coaa | performance | advisor | loot | combat | collection | settings | boss | boss share | reset | pve log on|off|status|clear | language fr|en | log | status | debug | retry")
+		Chat("/coaa | performance | advisor | loot | combat | collection | settings | minimap on|off|toggle|size|status | boss | boss share | reset | pve log on|off|status|clear | language fr|en | log | status | debug | retry")
 	end
 end
 

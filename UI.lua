@@ -144,6 +144,19 @@ local function RefreshSettingsControls()
 			addonDB.enableKeystoneBossFeature and 1 or nil
 		)
 	end
+	local raidMinimap = CoAAnalyticsAddon.Modules.RaidMinimap
+	local raidMinimapSettings = raidMinimap and raidMinimap.GetSettings
+		and raidMinimap.GetSettings()
+	if ui.raidMinimapEnabledCheckButton and raidMinimapSettings then
+		ui.raidMinimapEnabledCheckButton:SetChecked(
+			raidMinimapSettings.enabled and 1 or nil
+		)
+	end
+	if ui.raidMinimapSizeText and raidMinimapSettings then
+		ui.raidMinimapSizeText:SetText(
+			"Taille des points : " .. tostring(raidMinimapSettings.size) .. " px"
+		)
+	end
 	if ui.diagnosticStatusText and CoAAnalyticsPvE
 		and CoAAnalyticsPvE.GetDungeonDiagnosticStatus
 	then
@@ -1476,8 +1489,8 @@ ui.SetPlayerRankingCategory = function(categoryKey)
 end
 
 local function SetSettingsMode(mode)
-	if mode == "nameplates" then
-		ui.activeSettingsMode = "nameplates"
+	if mode == "nameplates" or mode == "raidminimap" then
+		ui.activeSettingsMode = mode
 	else
 		ui.activeSettingsMode = "general"
 	end
@@ -1488,6 +1501,10 @@ local function SetSettingsMode(mode)
 	SetModernTabActive(
 		ui.nameplateSettingsTabButton,
 		ui.activeSettingsMode == "nameplates"
+	)
+	SetModernTabActive(
+		ui.raidMinimapSettingsTabButton,
+		ui.activeSettingsMode == "raidminimap"
 	)
 	if ui.generalSettingsPanel then
 		if ui.activeSettingsMode == "general" then
@@ -1501,6 +1518,13 @@ local function SetSettingsMode(mode)
 			ui.nameplateOptionsPanel:Show()
 		else
 			ui.nameplateOptionsPanel:Hide()
+		end
+	end
+	if ui.raidMinimapOptionsPanel then
+		if ui.activeSettingsMode == "raidminimap" then
+			ui.raidMinimapOptionsPanel:Show()
+		else
+			ui.raidMinimapOptionsPanel:Hide()
 		end
 	end
 end
@@ -1887,6 +1911,21 @@ local function CreateSettingsFrame()
 		7,
 		0
 	)
+	ui.raidMinimapSettingsTabButton = CreateModernTab(
+		ui.nameplateSettingsPanel,
+		"Minicarte BG",
+		0.72,
+		0.18,
+		1.00
+	)
+	ui.raidMinimapSettingsTabButton:SetWidth(150)
+	ui.raidMinimapSettingsTabButton:SetPoint(
+		"LEFT",
+		ui.nameplateSettingsTabButton,
+		"RIGHT",
+		7,
+		0
+	)
 
 	ui.generalSettingsPanel = CreateFrame("Frame", nil, ui.nameplateSettingsPanel)
 	ui.generalSettingsPanel:SetPoint("TOPLEFT", ui.nameplateSettingsPanel, "TOPLEFT", 0, -42)
@@ -1896,6 +1935,142 @@ local function CreateSettingsFrame()
 	ui.nameplateOptionsPanel:SetPoint("TOPLEFT", ui.nameplateSettingsPanel, "TOPLEFT", 0, -42)
 	ui.nameplateOptionsPanel:SetPoint("BOTTOMRIGHT", ui.nameplateSettingsPanel, "BOTTOMRIGHT", 0, 0)
 	ui.nameplateOptionsPanel:Hide()
+	ui.raidMinimapOptionsPanel = CreateFrame(
+		"Frame", nil, ui.nameplateSettingsPanel
+	)
+	ui.raidMinimapOptionsPanel:SetPoint(
+		"TOPLEFT", ui.nameplateSettingsPanel, "TOPLEFT", 0, -42
+	)
+	ui.raidMinimapOptionsPanel:SetPoint(
+		"BOTTOMRIGHT", ui.nameplateSettingsPanel, "BOTTOMRIGHT", 0, 0
+	)
+	ui.raidMinimapOptionsPanel:Hide()
+
+	local raidMinimapCard = CreateFrame(
+		"Frame", nil, ui.raidMinimapOptionsPanel
+	)
+	raidMinimapCard:SetPoint(
+		"TOPLEFT", ui.raidMinimapOptionsPanel, "TOPLEFT", 8, -8
+	)
+	raidMinimapCard:SetPoint(
+		"TOPRIGHT", ui.raidMinimapOptionsPanel, "TOPRIGHT", -8, -8
+	)
+	raidMinimapCard:SetHeight(250)
+	raidMinimapCard:SetBackdrop({
+		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true,
+		tileSize = 16,
+		edgeSize = 10,
+		insets = { left = 3, right = 3, top = 3, bottom = 3 },
+	})
+	raidMinimapCard:SetBackdropColor(0.05, 0.055, 0.07, 0.96)
+	raidMinimapCard:SetBackdropBorderColor(0.32, 0.12, 0.46, 1)
+
+	local raidMinimapTitle = raidMinimapCard:CreateFontString(
+		nil, "OVERLAY", "GameFontNormalLarge"
+	)
+	raidMinimapTitle:SetPoint("TOPLEFT", raidMinimapCard, "TOPLEFT", 22, -20)
+	raidMinimapTitle:SetText("Raid sur la minicarte")
+	local raidMinimapDescription = raidMinimapCard:CreateFontString(
+		nil, "OVERLAY", "GameFontHighlightSmall"
+	)
+	raidMinimapDescription:SetPoint(
+		"TOPLEFT", raidMinimapCard, "TOPLEFT", 22, -50
+	)
+	raidMinimapDescription:SetPoint(
+		"TOPRIGHT", raidMinimapCard, "TOPRIGHT", -22, -50
+	)
+	raidMinimapDescription:SetHeight(54)
+	raidMinimapDescription:SetJustifyH("LEFT")
+	raidMinimapDescription:SetWordWrap(true)
+	raidMinimapDescription:SetText(
+		"Affiche en BG les membres des autres sous-groupes en violet et les drapeaux de capture sur la minicarte normale."
+	)
+
+	ui.raidMinimapEnabledCheckButton = CreateFrame(
+		"CheckButton",
+		"CoAAnalyticsRaidMinimapEnabledCheckButton",
+		raidMinimapCard,
+		"UICheckButtonTemplate"
+	)
+	ui.raidMinimapEnabledCheckButton:SetWidth(24)
+	ui.raidMinimapEnabledCheckButton:SetHeight(24)
+	ui.raidMinimapEnabledCheckButton:SetPoint(
+		"TOPLEFT", raidMinimapCard, "TOPLEFT", 21, -112
+	)
+	local raidMinimapEnabledLabel = raidMinimapCard:CreateFontString(
+		nil, "OVERLAY", "GameFontHighlight"
+	)
+	raidMinimapEnabledLabel:SetPoint(
+		"LEFT", ui.raidMinimapEnabledCheckButton, "RIGHT", 4, 0
+	)
+	raidMinimapEnabledLabel:SetText("Afficher le raid et les drapeaux en BG")
+	ui.raidMinimapEnabledCheckButton:SetScript("OnClick", function(self)
+		local module = CoAAnalyticsAddon.Modules.RaidMinimap
+		if module and module.SetEnabled then
+			module.SetEnabled(self:GetChecked() and true or false)
+		end
+	end)
+
+	ui.raidMinimapSizeText = raidMinimapCard:CreateFontString(
+		nil, "OVERLAY", "GameFontNormal"
+	)
+	ui.raidMinimapSizeText:SetPoint(
+		"TOPLEFT", raidMinimapCard, "TOPLEFT", 26, -164
+	)
+	ui.raidMinimapSizeText:SetText("Taille des points : 7 px")
+
+	local decreaseRaidMinimapSize = CreateFrame(
+		"Button", nil, raidMinimapCard, "UIPanelButtonTemplate"
+	)
+	decreaseRaidMinimapSize:SetWidth(36)
+	decreaseRaidMinimapSize:SetHeight(24)
+	decreaseRaidMinimapSize:SetPoint(
+		"TOPLEFT", raidMinimapCard, "TOPLEFT", 205, -157
+	)
+	decreaseRaidMinimapSize:SetText("-")
+	local increaseRaidMinimapSize = CreateFrame(
+		"Button", nil, raidMinimapCard, "UIPanelButtonTemplate"
+	)
+	increaseRaidMinimapSize:SetWidth(36)
+	increaseRaidMinimapSize:SetHeight(24)
+	increaseRaidMinimapSize:SetPoint(
+		"LEFT", decreaseRaidMinimapSize, "RIGHT", 6, 0
+	)
+	increaseRaidMinimapSize:SetText("+")
+	local function AdjustRaidMinimapSize(delta)
+		local module = CoAAnalyticsAddon.Modules.RaidMinimap
+		local moduleSettings = module and module.GetSettings
+			and module.GetSettings()
+		if module and module.SetSize and moduleSettings then
+			module.SetSize((moduleSettings.size or 7) + delta)
+			RefreshSettingsControls()
+		end
+	end
+	decreaseRaidMinimapSize:SetScript("OnClick", function()
+		AdjustRaidMinimapSize(-1)
+	end)
+	increaseRaidMinimapSize:SetScript("OnClick", function()
+		AdjustRaidMinimapSize(1)
+	end)
+
+	local resetRaidMinimapSize = CreateFrame(
+		"Button", nil, raidMinimapCard, "UIPanelButtonTemplate"
+	)
+	resetRaidMinimapSize:SetWidth(120)
+	resetRaidMinimapSize:SetHeight(24)
+	resetRaidMinimapSize:SetPoint(
+		"BOTTOMLEFT", raidMinimapCard, "BOTTOMLEFT", 22, 18
+	)
+	resetRaidMinimapSize:SetText("Taille par defaut")
+	resetRaidMinimapSize:SetScript("OnClick", function()
+		local module = CoAAnalyticsAddon.Modules.RaidMinimap
+		if module and module.SetSize then
+			module.SetSize(7)
+			RefreshSettingsControls()
+		end
+	end)
 
 	local overlayCard = CreateFrame("Frame", nil, ui.generalSettingsPanel)
 	overlayCard:SetPoint("TOPLEFT", ui.generalSettingsPanel, "TOPLEFT", 8, -8)
@@ -2785,6 +2960,9 @@ local function CreateSettingsFrame()
 	end)
 	ui.nameplateSettingsTabButton:SetScript("OnClick", function()
 		SetSettingsMode("nameplates")
+	end)
+	ui.raidMinimapSettingsTabButton:SetScript("OnClick", function()
+		SetSettingsMode("raidminimap")
 	end)
 	ui.rankingTabButton:SetScript("OnClick", function()
 		ui.activePerformanceTab = "ranking"

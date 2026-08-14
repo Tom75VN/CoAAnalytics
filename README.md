@@ -10,6 +10,7 @@ The release archive includes both `CoAAnalytics` and the optional
 ## Features
 
 - Battleground rankings for specializations and players
+- Battleground raid members and live capture flags on the normal minimap
 - Role-based scoring for dungeons and raids
 - Live dungeon performance ratings
 - Mythic 0 Keystone boss identification, required boss-order drawer, and English party sharing
@@ -40,5 +41,8 @@ under `/coaa advisor`, and DataProbe opens with `/coaa collection`.
 Use `/coaa reset` to print the next Mythic+ cache/coin cap increase.
 The same status and the latest Edrim counters are shown at the top of the
 Home page. Use `/coaa reset actualiser` to query the client timers again.
+Use `/coaa minimap` for raid-minimap status and
+`/coaa minimap size 6-20` to adjust its markers. The legacy `/coarm` and
+`/armm` commands remain available.
 
 Player data and diagnostic logs remain local in the game's `WTF` folder.
