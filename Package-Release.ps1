@@ -32,23 +32,52 @@ if (Test-Path -LiteralPath $archivePath) {
 
 New-Item -ItemType Directory -Path $mainTarget -Force | Out-Null
 
-$excludedNames = @(
-    ".git",
-    ".github",
-    ".gitignore",
-    "AGENTS.md",
-    "Package-Release.ps1",
-    "RELEASING.md",
-    "release"
-)
+function Copy-AddonRuntimeFiles {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Source,
+        [Parameter(Mandatory = $true)]
+        [string]$Target,
+        [Parameter(Mandatory = $true)]
+        [string]$TocName,
+        [string[]]$AdditionalPaths = @()
+    )
 
-Get-ChildItem -LiteralPath $mainSource -Force |
-    Where-Object { $_.Name -notin $excludedNames } |
-    ForEach-Object {
-        Copy-Item -LiteralPath $_.FullName -Destination $mainTarget -Recurse -Force
+    New-Item -ItemType Directory -Path $Target -Force | Out-Null
+
+    $tocSource = Join-Path $Source $TocName
+    if (-not (Test-Path -LiteralPath $tocSource -PathType Leaf)) {
+        throw "Required addon manifest is missing: $tocSource"
     }
 
-Copy-Item -LiteralPath $dataProbeSource -Destination $dataProbeTarget -Recurse -Force
+    $runtimePaths = @($TocName)
+    $runtimePaths += Get-Content -LiteralPath $tocSource |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ -and -not $_.StartsWith("#") }
+    $runtimePaths += $AdditionalPaths
+
+    foreach ($relativePath in ($runtimePaths | Select-Object -Unique)) {
+        $sourcePath = Join-Path $Source $relativePath
+        if (-not (Test-Path -LiteralPath $sourcePath)) {
+            throw "Runtime file listed for release is missing: $sourcePath"
+        }
+
+        $targetPath = Join-Path $Target $relativePath
+        $targetParent = Split-Path $targetPath -Parent
+        New-Item -ItemType Directory -Path $targetParent -Force | Out-Null
+        Copy-Item -LiteralPath $sourcePath -Destination $targetPath -Recurse -Force
+    }
+}
+
+Copy-AddonRuntimeFiles `
+    -Source $mainSource `
+    -Target $mainTarget `
+    -TocName "CoAAnalytics.toc" `
+    -AdditionalPaths @("Textures")
+Copy-AddonRuntimeFiles `
+    -Source $dataProbeSource `
+    -Target $dataProbeTarget `
+    -TocName "CoAAnalytics_DataProbe.toc"
 Compress-Archive -Path (Join-Path $stagingRoot "*") -DestinationPath $archivePath -CompressionLevel Optimal
 Remove-Item -LiteralPath $stagingRoot -Recurse -Force
 
