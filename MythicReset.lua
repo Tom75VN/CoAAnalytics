@@ -5,11 +5,17 @@ CoAAnalyticsAddon.Modules.MythicReset = Module
 local WEEK_SECONDS = 7 * 24 * 60 * 60
 local MAX_RESET_SECONDS = 8 * 24 * 60 * 60
 local COUNTER_OBSERVATION_WINDOW = 8 * 60 * 60
+local MYTHIC_COIN_CURRENCY_ID = 55
+local MYTHICAL_CACHE_ITEM_ID = 2093995
+local COUNTER_POLL_INTERVAL = 5
 
 local driver = CreateFrame("Frame")
 local addonDB
 local resetDB
 local initialized = false
+local counterPollElapsed = 0
+local counterScanPending = false
+local ObserveCounters
 
 local function Chat(message)
 	local chatFrame = DEFAULT_CHAT_FRAME or ChatFrame1
@@ -263,6 +269,9 @@ local function GetCounterText()
 end
 
 function Module.GetStatus()
+	if ObserveCounters then
+		ObserveCounters(true)
+	end
 	local seconds, source, confidence = Module.Refresh()
 	if not seconds then
 		return {
@@ -374,6 +383,289 @@ local function SaveCounter(kind, current, maximum)
 	}
 end
 
+local function GetCharacterObservationKey()
+	if type(UnitGUID) == "function" then
+		local guid = UnitGUID("player")
+		if guid and guid ~= "" then
+			return guid
+		end
+	end
+	if type(UnitName) == "function" then
+		local name, realm = UnitName("player")
+		if name and name ~= "" then
+			return realm and realm ~= "" and (name .. "-" .. realm) or name
+		end
+	end
+	return "player"
+end
+
+local function GetObservationStore()
+	if not resetDB then
+		return
+	end
+	resetDB.observations = type(resetDB.observations) == "table"
+		and resetDB.observations or {}
+	resetDB.observations.coinBalances =
+		type(resetDB.observations.coinBalances) == "table"
+		and resetDB.observations.coinBalances or {}
+	resetDB.observations.cacheItemCounts =
+		type(resetDB.observations.cacheItemCounts) == "table"
+		and resetDB.observations.cacheItemCounts or {}
+	return resetDB.observations
+end
+
+local function IncrementTrackedCounter(kind, amount)
+	amount = math.floor(tonumber(amount) or 0)
+	if amount <= 0 or not resetDB or type(resetDB.counters) ~= "table" then
+		return false
+	end
+	local counter = resetDB.counters[kind]
+	if type(counter) ~= "table" then
+		return false
+	end
+	counter.current = math.max(0, (tonumber(counter.current) or 0) + amount)
+	counter.seenAt = GetServerEpoch()
+	counter.source = "automatic client observation"
+	return true
+end
+
+local function IsNamedCounter(name, kind)
+	name = string.lower(tostring(name or ""))
+	if kind == "coins" then
+		return name:find("mythic", 1, true)
+			and name:find("coin", 1, true)
+	end
+	return name:find("myth", 1, true)
+		and name:find("cache", 1, true)
+end
+
+local function ApplyDirectCurrencyCounter(kind, name, current, maximum)
+	current = tonumber(current)
+	maximum = tonumber(maximum)
+	if not IsNamedCounter(name, kind)
+		or not current or current < 0
+		or not maximum or maximum <= 0
+	then
+		return false
+	end
+
+	local previous = resetDB and resetDB.counters and resetDB.counters[kind]
+	local previousCurrent = previous and tonumber(previous.current) or 0
+	local previousMaximum = previous and tonumber(previous.maximum) or 0
+	-- Never replace the cumulative NPC counter with a smaller weekly currency
+	-- limit or with a spendable balance that dropped after a purchase.
+	if maximum < previousMaximum or current < previousCurrent then
+		return false
+	end
+	SaveCounter(kind, current, maximum)
+	if resetDB.counters and resetDB.counters[kind] then
+		resetDB.counters[kind].source = "currency API"
+	end
+	return true
+end
+
+local function SyncCacheMaximumFromCoinCap()
+	local counters = resetDB and resetDB.counters
+	local coins = counters and counters.coins
+	local caches = counters and counters.caches
+	local coinMaximum = coins and tonumber(coins.maximum)
+	if not coinMaximum or coinMaximum <= 0 or type(caches) ~= "table" then
+		return false
+	end
+	-- Ascension publishes both limits on the same progression track: the
+	-- initial 2,750-coin cap corresponds to 40 cache openings. This also
+	-- matches the later 8,250/120 and 12,375/180 cap pairs.
+	local inferredMaximum = math.floor(coinMaximum * 40 / 2750 + 0.5)
+	if inferredMaximum <= (tonumber(caches.maximum) or 0) then
+		return false
+	end
+	caches.maximum = inferredMaximum
+	caches.seenAt = GetServerEpoch()
+	caches.source = "derived from Mythic Coin currency cap"
+	return true
+end
+
+local function ReadCurrencyInfoTable(info, kind)
+	if type(info) ~= "table" then
+		return nil, false
+	end
+	local name = info.name or info.currencyName
+	if not IsNamedCounter(name, kind) then
+		return tonumber(info.quantity), false
+	end
+	local balance = tonumber(info.quantity or info.amount)
+	local earned = tonumber(
+		info.quantityEarnedThisWeek
+			or info.currentWeeklyAmount
+			or info.earnedThisWeek
+	)
+	local weeklyMaximum = tonumber(
+		info.maxWeeklyQuantity
+			or info.weeklyMaximum
+			or info.maxWeeklyAmount
+	)
+	local captured = ApplyDirectCurrencyCounter(
+		kind,
+		name,
+		earned,
+		weeklyMaximum
+	)
+	return balance, captured
+end
+
+local function QueryMythicCoinCurrency()
+	local balance
+	local captured = false
+	if type(C_CurrencyInfo) == "table"
+		and type(C_CurrencyInfo.GetCurrencyInfo) == "function"
+	then
+		local ok, info = pcall(
+			C_CurrencyInfo.GetCurrencyInfo,
+			MYTHIC_COIN_CURRENCY_ID
+		)
+		if ok then
+			balance, captured = ReadCurrencyInfoTable(info, "coins")
+		end
+	end
+	if not balance and type(GetCurrencyInfo) == "function" then
+		local results = { pcall(GetCurrencyInfo, MYTHIC_COIN_CURRENCY_ID) }
+		if table.remove(results, 1) then
+			local name = results[1]
+			if IsNamedCounter(name, "coins") then
+				balance = tonumber(results[2])
+				local earned = tonumber(results[4])
+				local weeklyMaximum = tonumber(results[5])
+				captured = ApplyDirectCurrencyCounter(
+					"coins",
+					name,
+					earned,
+					weeklyMaximum
+				) or captured
+			end
+		end
+	end
+	return balance, captured
+end
+
+local function ScanCurrencyListCounters()
+	local coinBalance
+	local directCoinCounter = false
+	if type(C_CurrencyInfo) == "table"
+		and type(C_CurrencyInfo.GetCurrencyListSize) == "function"
+		and type(C_CurrencyInfo.GetCurrencyListInfo) == "function"
+	then
+		local ok, size = pcall(C_CurrencyInfo.GetCurrencyListSize)
+		if ok and type(size) == "number" then
+			for index = 1, math.min(size, 500) do
+				local infoOK, info = pcall(C_CurrencyInfo.GetCurrencyListInfo, index)
+				if infoOK and type(info) == "table" then
+					local balance, captured = ReadCurrencyInfoTable(info, "coins")
+					if IsNamedCounter(info.name or info.currencyName, "coins") then
+						coinBalance = balance or coinBalance
+						directCoinCounter = captured or directCoinCounter
+					end
+					ReadCurrencyInfoTable(info, "caches")
+				end
+			end
+		end
+	end
+
+	if type(GetCurrencyListSize) == "function"
+		and type(GetCurrencyListInfo) == "function"
+	then
+		local ok, size = pcall(GetCurrencyListSize)
+		if ok and type(size) == "number" then
+			for index = 1, math.min(size, 500) do
+				local values = { pcall(GetCurrencyListInfo, index) }
+				if table.remove(values, 1) then
+					local name = values[1]
+					local balance = tonumber(values[6])
+					local current = tonumber(values[10])
+					local maximum = tonumber(values[8])
+					local captured = ApplyDirectCurrencyCounter(
+						"coins",
+						name,
+						current,
+						maximum
+					)
+					if IsNamedCounter(name, "coins") then
+						coinBalance = balance or coinBalance
+						directCoinCounter = captured or directCoinCounter
+					end
+					ApplyDirectCurrencyCounter("caches", name, current, maximum)
+				end
+			end
+		end
+	end
+	return coinBalance, directCoinCounter
+end
+
+ObserveCounters = function(scanCurrencyList)
+	if not initialized or not resetDB then
+		return false
+	end
+	local observations = GetObservationStore()
+	if not observations then
+		return false
+	end
+	local characterKey = GetCharacterObservationKey()
+	local changed = false
+
+	local coinBalance, directCoinCounter = QueryMythicCoinCurrency()
+	if scanCurrencyList then
+		local listedBalance, listedDirectCounter = ScanCurrencyListCounters()
+		coinBalance = coinBalance or listedBalance
+		directCoinCounter = directCoinCounter or listedDirectCounter
+	end
+	if coinBalance then
+		local previousBalance = tonumber(observations.coinBalances[characterKey])
+		if previousBalance and coinBalance > previousBalance and not directCoinCounter then
+			changed = IncrementTrackedCounter(
+				"coins",
+				coinBalance - previousBalance
+			) or changed
+		end
+		observations.coinBalances[characterKey] = coinBalance
+	end
+
+	if type(GetItemCount) == "function" then
+		local ok, cacheCount = pcall(GetItemCount, MYTHICAL_CACHE_ITEM_ID, false)
+		cacheCount = ok and tonumber(cacheCount) or nil
+		if cacheCount then
+			local previousCount = tonumber(observations.cacheItemCounts[characterKey])
+			if previousCount and cacheCount < previousCount then
+				changed = IncrementTrackedCounter(
+					"caches",
+					previousCount - cacheCount
+				) or changed
+			end
+			observations.cacheItemCounts[characterKey] = cacheCount
+		end
+	end
+	changed = SyncCacheMaximumFromCoinCap() or changed
+
+	if changed and CoAAnalyticsAddon.Events then
+		CoAAnalyticsAddon.Events:Fire("MYTHIC_RESET_UPDATED")
+	end
+	return changed
+end
+
+local function ScheduleCounterObservation(delay, scanCurrencyList)
+	if counterScanPending then
+		return
+	end
+	counterScanPending = true
+	local function Run()
+		counterScanPending = false
+		ObserveCounters(scanCurrencyList)
+	end
+	if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+		C_Timer.After(delay or 0, Run)
+	else
+		Run()
+	end
+end
+
 function Module.CaptureCountersFromText(text)
 	if type(text) ~= "string" then
 		return false
@@ -388,6 +680,9 @@ function Module.CaptureCountersFromText(text)
 	if current then
 		SaveCounter("coins", tonumber(current), tonumber(maximum))
 		captured = true
+	end
+	if captured then
+		ScheduleCounterObservation(0, false)
 	end
 	return captured
 end
@@ -450,6 +745,7 @@ function Module.Initialize()
 		pcall(RequestRaidInfo)
 	end
 	ScheduleScans()
+	ScheduleCounterObservation(1, true)
 	return true
 end
 
@@ -459,6 +755,9 @@ RegisterOptionalEvent("UPDATE_INSTANCE_INFO")
 RegisterOptionalEvent("QUERY_INSTANCE_BINDS_RESULT")
 RegisterOptionalEvent("GOSSIP_SHOW")
 RegisterOptionalEvent("ASCENSION_UNKNOWN_WINDOW_VISIBILITY_CHANGED")
+RegisterOptionalEvent("CURRENCY_DISPLAY_UPDATE")
+RegisterOptionalEvent("BAG_UPDATE_DELAYED")
+RegisterOptionalEvent("CHAT_MSG_CURRENCY")
 
 driver:SetScript("OnEvent", function(_, eventName)
 	if eventName == "PLAYER_LOGIN" then
@@ -468,8 +767,25 @@ driver:SetScript("OnEvent", function(_, eventName)
 			or eventName == "ASCENSION_UNKNOWN_WINDOW_VISIBILITY_CHANGED"
 		then
 			ScheduleScans()
+		elseif eventName == "CURRENCY_DISPLAY_UPDATE"
+			or eventName == "BAG_UPDATE_DELAYED"
+			or eventName == "CHAT_MSG_CURRENCY"
+		then
+			ScheduleCounterObservation(0.25, true)
 		else
 			Module.Refresh()
+			ScheduleCounterObservation(0.75, true)
 		end
+	end
+end)
+
+driver:SetScript("OnUpdate", function(_, elapsed)
+	if not initialized then
+		return
+	end
+	counterPollElapsed = counterPollElapsed + elapsed
+	if counterPollElapsed >= COUNTER_POLL_INTERVAL then
+		counterPollElapsed = 0
+		ObserveCounters(true)
 	end
 end)
