@@ -388,7 +388,7 @@ local function SetFeedback(text, isError)
 end
 
 local function RefreshLanguageButtons()
-    local selected = Advisor.GetLanguage and Advisor.GetLanguage() or "fr"
+    local selected = Advisor.GetLanguage and Advisor.GetLanguage() or "en"
     for language, button in pairs(languageButtons) do
         local active = language == selected
         button:SetAlpha(active and 1 or 0.58)

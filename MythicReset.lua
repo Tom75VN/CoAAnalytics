@@ -20,7 +20,10 @@ local ObserveCounters
 local function Chat(message)
 	local chatFrame = DEFAULT_CHAT_FRAME or ChatFrame1
 	if chatFrame then
-		chatFrame:AddMessage("|cff00ba79CoA Analytics:|r " .. tostring(message))
+		chatFrame:AddMessage(
+			"|cff00ba79CoA Analytics:|r "
+				.. API.LocalizeText(tostring(message))
+		)
 	end
 end
 
@@ -237,7 +240,13 @@ local function FormatDuration(seconds)
 	local hours = math.floor((seconds % 86400) / 3600)
 	local minutes = math.floor((seconds % 3600) / 60)
 	if days > 0 then
-		return string.format("%dj %02dh %02dm", days, hours, minutes)
+		return string.format(
+			"%d%s %02dh %02dm",
+			days,
+			API.GetLanguage() == "en" and "d" or "j",
+			hours,
+			minutes
+		)
 	end
 	if hours > 0 then
 		return string.format("%dh %02dm", hours, minutes)
@@ -284,7 +293,11 @@ function Module.GetStatus()
 	local nextResetAt = resetDB and tonumber(resetDB.nextResetAt)
 	local localDate
 	if nextResetAt and type(date) == "function" then
-		localDate = date("%d/%m a %H:%M", nextResetAt)
+		localDate = date(
+			API.GetLanguage() == "en"
+				and "%m/%d at %H:%M" or "%d/%m a %H:%M",
+			nextResetAt
+		)
 	end
 	return {
 		known = true,

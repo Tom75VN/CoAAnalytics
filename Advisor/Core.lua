@@ -14,7 +14,7 @@ local function EnsureDB()
     end
     if CoAAnalyticsAdvisorDB.language ~= "en" and
         CoAAnalyticsAdvisorDB.language ~= "fr" then
-        CoAAnalyticsAdvisorDB.language = "fr"
+        CoAAnalyticsAdvisorDB.language = "en"
     end
     if CoAAnalyticsAdvisorDB.enabled == nil then CoAAnalyticsAdvisorDB.enabled = true end
     if CoAAnalyticsAdvisorDB.autoGreedIncompatibleLoot == nil then

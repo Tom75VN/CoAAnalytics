@@ -1,6 +1,7 @@
 local API = CoAAnalyticsAPI
 
--- Le francais reste la langue par defaut des installations existantes.
+-- English is the default for new installations. Existing explicit choices
+-- remain stored in CoAAnalyticsDB.
 -- Les textes sources restent en francais afin de limiter les changements dans
 -- les modules de calcul; cette table traduit uniquement ce qui est affiche.
 local ENGLISH = {
@@ -133,6 +134,7 @@ local ENGLISH = {
 	["Non"] = "No",
 	["Annuler"] = "Cancel",
 	["Cliquer pour utiliser cette langue."] = "Click to use this language.",
+	["Francais"] = "French",
 	["Langues disponibles : Francais (fr), Anglais (en)."] = "Available languages: French (fr), English (en).",
 	["Affichage au-dessus des joueurs"] = "Display Above Players",
 	["Icone du role"] = "Role Icon",
@@ -184,6 +186,8 @@ local ENGLISH = {
 	["Specialisation inconnue"] = "Unknown specialization",
 	["Role inconnu"] = "Unknown role",
 	["Joueur inconnu"] = "Unknown player",
+	["joueur inconnu"] = "unknown player",
+	["Boss inconnu"] = "Unknown boss",
 	["Donjon inconnu"] = "Unknown dungeon",
 	["Donjon"] = "Dungeon",
 	["Joueur"] = "Player",
@@ -195,6 +199,7 @@ local ENGLISH = {
 	["Inconnu"] = "Unknown",
 	["Inconnue"] = "Unknown",
 	["inconnue"] = "unknown",
+	["inconnu"] = "unknown",
 	["faible"] = "low",
 	["normale"] = "normal",
 	["elevee"] = "high",
@@ -240,6 +245,18 @@ local ENGLISH = {
 	["Envoie la note du groupe, puis une ligne par joueur."] = "Sends the group rating, followed by one line per player.",
 	["Cliquez sur Tout selectionner, faites Ctrl+C, puis envoyez le texte apres le BG."] =
 		"Click Select All, press Ctrl+C, then send the text after the BG.",
+	["Heure non disponible"] = "Time unavailable",
+	["Le module de suivi n'est pas charge. Fais /reload puis reouvre cette page."] =
+		"The tracking module is not loaded. Run /reload, then reopen this page.",
+	[" (heure locale). "] = " (local time). ",
+	[" heure locale"] = " local time",
+	["Heure de la prochaine hausse M+ non detectee. Utilise /coaa reset actualiser pour interroger les timers hebdomadaires. Edrim fournit les compteurs, mais pas l'heure."] =
+		"The next Mythic+ cap increase time was not detected. Use /coaa reset refresh to query the weekly timers. Edrim provides the counters, but not the time.",
+	["Augmentation des plafonds M+ dans "] = "Mythic+ caps increase in ",
+	["mesure directe"] = "direct measurement",
+	["source inconnue"] = "unknown source",
+	["verrouillage de raid"] = "raid lockout",
+	["reset de raid hebdomadaire"] = "weekly raid reset",
 
 	["Le score compare les performances moyennes, pas le nombre total de presences. Cinq participations virtuelles a la moyenne stabilisent les petits echantillons."] =
 		"The score compares average performance, not total appearances. Five virtual average participations stabilize small samples.",
@@ -408,6 +425,7 @@ local ENGLISH = {
 	["aucune performance notee"] = "no rated performance",
 	["fin du donjon"] = "dungeon completion",
 	["sortie du donjon"] = "leaving the dungeon",
+	["sortie apres boss"] = "exit after boss",
 	["diagnostic enregistre ("] = "diagnostic recorded (",
 	["). Le suivi reste actif pour le prochain donjon."] = "). Tracking remains active for the next dungeon.",
 	["dernier donjon conserve"] = "last retained dungeon",
@@ -455,10 +473,10 @@ end
 
 function API.GetLanguage()
 	local database = _G.CoAAnalyticsDB
-	if type(database) == "table" and database.language == "en" then
-		return "en"
+	if type(database) == "table" and database.language == "fr" then
+		return "fr"
 	end
-	return "fr"
+	return "en"
 end
 
 function API.LocalizeText(value)

@@ -435,7 +435,10 @@ end
 local function Notify(message)
 	local chatFrame = DEFAULT_CHAT_FRAME or ChatFrame1
 	if chatFrame then
-		chatFrame:AddMessage("|cff12c98aCoA Analytics:|r " .. tostring(message or ""))
+		chatFrame:AddMessage(
+			"|cff12c98aCoA Analytics:|r "
+				.. API.LocalizeText(tostring(message or ""))
+		)
 	end
 end
 

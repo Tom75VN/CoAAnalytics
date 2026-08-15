@@ -745,7 +745,7 @@ local function InitializeDatabase()
 	end
 	addonDB = CoAAnalyticsDB
 	if addonDB.language ~= "fr" and addonDB.language ~= "en" then
-		addonDB.language = "fr"
+		addonDB.language = "en"
 	end
 	InitializeRankingDatabase()
 
@@ -1124,7 +1124,7 @@ function AllyJournal:Show()
 		selectButton:SetWidth(150)
 		selectButton:SetHeight(24)
 		selectButton:SetPoint("BOTTOMLEFT", 24, 22)
-		selectButton:SetText("Tout selectionner")
+		selectButton:SetText(API.LocalizeText("Tout selectionner"))
 		selectButton:SetScript("OnClick", function()
 			editBox:SetFocus()
 			editBox:HighlightText()
@@ -1135,7 +1135,7 @@ function AllyJournal:Show()
 		closeButton:SetWidth(100)
 		closeButton:SetHeight(24)
 		closeButton:SetPoint("BOTTOMRIGHT", -24, 22)
-		closeButton:SetText("Fermer")
+		closeButton:SetText(API.LocalizeText("Fermer"))
 		closeButton:SetScript("OnClick", function()
 			frame:Hide()
 		end)

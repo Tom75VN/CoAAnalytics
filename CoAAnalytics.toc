@@ -1,8 +1,8 @@
 ## Interface: 30300
 ## Title: CoA Analytics
-## Notes: Analyse des performances, conseils de personnage, butin et collecte pour Conquest of Azeroth.
+## Notes: Performance analysis, character advice, loot tools, and data collection for Conquest of Azeroth.
 ## Author: OpenAI
-## Version: 3.1.2
+## Version: 3.1.3
 ## SavedVariables: CoAAnalyticsDB
 
 Namespace.lua

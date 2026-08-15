@@ -584,7 +584,6 @@ local ENGLISH = {
     ["Effet vitesse reconnu : +"] = "Recognized speed effect: +",
     ["Bonus vitesse conservé sur les deux objets : +"] =
         "Movement speed bonus kept on both items: +",
-    ["Bonus de soins"] = "Healing bonus",
     ["Toucher : "] = "Hit: ",
     [" (profil provisoire)"] = " (provisional profile)",
     [" (à confirmer par DataProbe PvE)"] = " (to confirm with PvE DataProbe)",
@@ -616,7 +615,6 @@ local ENGLISH = {
     ["Strength (non valorisée)"] = "Strength (not valued)",
     ["DPS de l’arme à distance"] = "Ranged Weapon DPS",
     ["DPS de l’arme"] = "Weapon DPS",
-    ["Puissance d’attaque"] = "Attack Power",
     ["Score de coup critique"] = "Critical Strike Rating",
     ["Score de hâte"] = "Haste Rating",
     ["Score de toucher"] = "Hit Rating",
@@ -625,9 +623,7 @@ local ENGLISH = {
     ["Score d’esquive"] = "Dodge Rating",
     ["Score de parade"] = "Parry Rating",
     ["Résistances"] = "Resistances",
-    ["Pénétration d’armure"] = "Armor Penetration",
     ["Armure"] = "Armor",
-    ["Vie par 5 s"] = "Health per 5",
     ["Vitesse de course %"] = "Run Speed %",
     ["Force (non valorisée)"] = "Strength (not valued)",
     ["Agilité (sans valeur pour les soins)"] =
@@ -809,16 +805,7 @@ local ENGLISH = {
         "% complete. The remainder must be measured with DataProbe.",
     [" Les boutons règlent ensuite l'objectif du score."] =
         " The buttons then set the scoring goal.",
-    ["Résilience"] = "Resilience",
-    ["Puissance JcJ"] = "PvP Power",
-    ["Puissance JcE"] = "PvE Power",
-    ["Endurance"] = "Stamina",
-    ["Esprit"] = "Spirit",
-    ["Puissance des sorts"] = "Spell Power",
-    ["Hâte"] = "Haste",
-    ["Intelligence"] = "Intellect",
     ["Coup critique"] = "Critical Strike",
-    ["Critique"] = "Critical Strike",
     ["Soins"] = "Healing",
     ["Utilité"] = "Utility",
     ["Fiabilité de l’analyse"] = "Analysis confidence",
@@ -847,11 +834,8 @@ local ENGLISH = {
     ["Toucher jusqu'au cap"] = "Hit up to cap",
     ["Toucher (cap)"] = "Hit (cap)",
     ["Expertise (cap)"] = "Expertise (cap)",
-    ["Pénétration d’armure"] = "Armor Penetration",
     ["Pénétration d'armure"] = "Armor Penetration",
     ["Défense"] = "Defense",
-    ["Agilité"] = "Agility",
-    ["Force"] = "Strength",
     ["Précision"] = "Accuracy",
     ["Blocage"] = "Block",
     ["Défense (cap)"] = "Defense (cap)",
@@ -861,7 +845,6 @@ local ENGLISH = {
     ["Parade / Esquive"] = "Parry / Dodge",
     ["Coup critique / Hâte"] = "Critical Strike / Haste",
     ["Intelligence / Endurance"] = "Intellect / Stamina",
-    ["Pénétration des sorts"] = "Spell Penetration",
     ["Taux/Valeur de Bloc"] = "Block Rating/Value",
     ["Toucher / Expertise (caps)"] = "Hit / Expertise (caps)",
     ["Toucher des sorts (cap)"] = "Spell Hit (cap)",
@@ -878,8 +861,6 @@ local ENGLISH = {
         "The recommendation model will be added after DataProbe sessions are analyzed.",
     ["Aucune donnée détaillée destinée à la communauté n’est collectée avant "] =
         "No detailed community contribution data is collected before ",
-    ["Une nouvelle session efface l'archive précédente, même si elle n'a pas encore été envoyée."] =
-        "A new session clears the previous archive, even if it has not been sent yet.",
     ["Talents non détectés : ouvre les arbres puis capture."] =
         "Talents not detected: open the trees, then capture.",
     [" avec DataProbe communautaire"] = " with community DataProbe",
@@ -972,8 +953,6 @@ local ENGLISH = {
     ["contenu dominant "] = "dominant content ",
     ["aucun profil pour cette spécialisation. DataProbe reste disponible pour aider à en construire un."] =
         "no profile for this specialization. DataProbe remains available to help build one.",
-    ["Cet objet sacrifie une priorité détectée dans tes combats."] =
-        "This item sacrifices a priority detected in your fights.",
     ["Amélioration équilibrée pour Mythic+ : soins et autonomie progressent."] =
         "Balanced Mythic+ upgrade: both healing and sustain improve.",
     ["Meilleur débit de soins, avec une autonomie mana en baisse."] =
@@ -1007,6 +986,47 @@ local ENGLISH = {
     [" s, soit ~+"] = " sec, averaging ~+",
     [" en moyenne si utilisée à chaque recharge."] =
         " when used on cooldown.",
+
+    -- Dynamic labels and sentence fragments that are assembled at runtime.
+    ["Renforce Roll Back avec une dissipation supplémentaire, utile dans le chemin Mythic+ vérifié."] =
+        "Improves Roll Back with an additional dispel, useful in the verified Mythic+ path.",
+    ["Les Aeons accumulent un puissant bonus de dégâts et de soins."] =
+        "Aeons build up a powerful damage and healing bonus.",
+    ["Fortify Timeline prolonge davantage Accelerated Recovery sur le groupe."] =
+        "Fortify Timeline extends Accelerated Recovery on the group even further.",
+    ["Adapte Ripple à l'Aeon actif pour les soins, absorptions ou dégâts de zone."] =
+        "Adapts Ripple to the active Aeon for healing, absorbs, or area damage.",
+    ["Double repoussement frontal utile pour contrôler les groupes en Mythic+."] =
+        "A double frontal knockback useful for controlling groups in Mythic+.",
+    ["Réduit fortement la durée des maladies, un choix utilitaire du build Mythic+ vérifié."] =
+        "Greatly reduces disease duration, a utility choice in the verified Mythic+ build.",
+    ["Réduit le temps de recharge des Aeons et fluidifie les changements de posture."] =
+        "Reduces Aeon cooldowns and smooths stance changes.",
+    ["Les soins périodiques réduisent le temps de recharge de Fortify Timeline."] =
+        "Periodic healing reduces Fortify Timeline's cooldown.",
+    ["PvE : Toucher jusqu'au cap d'une cible +3 > Agilité > Critique > Pénétration > Hâte."] =
+        "PvE: Hit to the cap against a +3 target > Agility > Critical Strike > Penetration > Haste.",
+    ["priorité non publiée — DataProbe requis"] =
+        "priority not published — DataProbe required",
+    ["tu veux améliorer la ressource et le rythme"] =
+        "you want to improve resource management and tempo",
+    ["% des combats se terminent mort : privilégie la survie."] =
+        "% of fights end in death: prioritize survival.",
+    ["% des combats finissent sous 20 % de mana : privilégie mana et régénération."] =
+        "% of fights end below 20% mana: prioritize mana and regeneration.",
+    ["% de morts et forte pression de vie : privilégie la mitigation."] =
+        "% deaths with heavy health pressure: prioritize mitigation.",
+    ["% des combats se terminent mort : privilégie survie et contrôle."] =
+        "% of fights end in death: prioritize survival and control.",
+    [". Les objets et talents sont recalculés."] =
+        ". Gear and talents are recalculated.",
+    ["élevée"] = "high",
+    ["Dégâts"] = "Damage",
+    ["Classe"] = "Class",
+    ["Spécialisation"] = "Specialization",
+    ["spécialisation"] = "specialization",
+    [" avec CoA Analytics"] = " with CoA Analytics",
+    [" sélectionnés"] = " selected",
 }
 
 local replacements
@@ -1040,8 +1060,8 @@ end
 
 function Advisor.GetLanguage()
     local db = _G.CoAAnalyticsDB
-    if type(db) == "table" and db.language == "en" then return "en" end
-    return "fr"
+    if type(db) == "table" and db.language == "fr" then return "fr" end
+    return "en"
 end
 
 function Advisor.LocalizeText(value)
